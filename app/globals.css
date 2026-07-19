@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: #050007;
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(255, 43, 214, 0.22), transparent 34rem),
+    radial-gradient(circle at bottom right, rgba(255, 0, 127, 0.16), transparent 28rem),
+    #050007;
+  color: #fff7fd;
+}
+
+main {
+  color: #fff7fd !important;
+}
+
+.bg-white {
+  background-color: rgba(10, 0, 12, 0.78) !important;
+}
+
+.bg-slate-50 {
+  background-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+.bg-pink-50,
+.bg-green-50,
+.bg-red-50 {
+  background-color: rgba(255, 43, 214, 0.12) !important;
+}
+
+.border-slate-200,
+.border-slate-300,
+.border-pink-100 {
+  border-color: rgba(255, 255, 255, 0.14) !important;
+}
+
+.text-slate-950,
+.text-slate-900,
+.text-slate-700,
+.text-slate-600,
+.text-slate-500 {
+  color: rgba(255, 247, 253, 0.78) !important;
+}
+
+.text-pink-600,
+.text-pink-700 {
+  color: #ff7be8 !important;
+}
+
+.bg-pink-600,
+.bg-slate-900 {
+  background-color: #ff2bd6 !important;
+  color: #120013 !important;
+}
+
+input,
+textarea {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff7fd;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: rgba(255, 247, 253, 0.48);
+}
+
+summary,
+button {
+  color: inherit;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(255, 43, 214, 0.45);
+}
