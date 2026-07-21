@@ -6,7 +6,7 @@ type Tone = "やさしい" | "煽り系" | "共感系" | "プロっぽい";
 type Template = "basic" | "education" | "story";
 type Mode = "single" | "weekly";
 type AgentId = "research" | "buzz" | "account" | "planning" | "writing";
-type View = "dashboard" | "profile" | "analysis" | "calendar" | "history";
+type View = "dashboard" | "profile" | "instant" | "analysis" | "calendar" | "history";
 
 type GeneratedPost = {
   title: string;
@@ -131,6 +131,9 @@ export default function Home() {
   const [threadsAuthCode, setThreadsAuthCode] = useState("");
   const [threadsAuthStatus, setThreadsAuthStatus] = useState("");
   const [testPostText, setTestPostText] = useState("テスト投稿です。SNS投稿ツールからThreads連携を確認しています。");
+  const [instantRawText, setInstantRawText] = useState("");
+  const [instantPostText, setInstantPostText] = useState("");
+  const [instantLoading, setInstantLoading] = useState(false);
   const [postedIds, setPostedIds] = useState<Record<string, string>>({});
   const [scheduleStartDate, setScheduleStartDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [postTimes, setPostTimes] = useState(["08:00", "12:30", "20:00", ""]);
@@ -507,6 +510,39 @@ export default function Home() {
     await publishToThreads(`test-${Date.now()}`, testPostText);
   }
 
+  async function polishInstantPost() {
+    if (!instantRawText.trim()) {
+      setError("整えたい言葉を入力してください。");
+      return;
+    }
+
+    setError("");
+    setInstantLoading(true);
+
+    try {
+      const response = await fetch("/api/instant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rawText: instantRawText,
+          character,
+          profileHistory,
+          personalExperiences,
+          tone
+        })
+      });
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.message || "今すぐ投稿の整形に失敗しました。");
+
+      setInstantPostText(data.text || "");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "今すぐ投稿の整形でエラーが発生しました。");
+    } finally {
+      setInstantLoading(false);
+    }
+  }
+
   async function publishManyToThreads(items: { id: string; text: string }[]) {
     const targets = items.filter((item) => !postedIds[item.id] && item.text.trim());
     if (!targets.length) {
@@ -706,9 +742,10 @@ export default function Home() {
         <p className="mt-2 text-sm text-slate-600">月4回だけ確認。1回で7日分を作り、修正したら予約・投稿するだけにします。</p>
       </header>
 
-      <nav className="mb-6 grid gap-2 sm:grid-cols-5">
+      <nav className="mb-6 grid gap-2 sm:grid-cols-6">
         <NavButton active={view === "dashboard"} onClick={() => setView("dashboard")}>ダッシュボード</NavButton>
         <NavButton active={view === "profile"} onClick={() => setView("profile")}>素材設定</NavButton>
+        <NavButton active={view === "instant"} onClick={() => setView("instant")}>今すぐ投稿</NavButton>
         <NavButton active={view === "analysis"} onClick={() => setView("analysis")}>AI分析</NavButton>
         <NavButton active={view === "calendar"} onClick={() => setView("calendar")}>投稿カレンダー</NavButton>
         <NavButton active={view === "history"} onClick={() => setView("history")}>履歴</NavButton>
@@ -958,6 +995,74 @@ export default function Home() {
         </details>
       </section>
       </>
+      ) : null}
+
+      {view === "instant" ? (
+        <section className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-xl font-bold">今すぐ投稿</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                急に投稿したくなった言葉を、キャティの口調に整えます。実績も少しだけ自然に混ぜます。
+              </p>
+            </div>
+            <p className="text-xs font-bold text-slate-500">{instantPostText.length}/500文字</p>
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <label className="block text-sm font-bold">
+              入れたい言葉・メモ
+              <textarea
+                value={instantRawText}
+                onChange={(event) => setInstantRawText(event.target.value)}
+                rows={9}
+                placeholder="例: 副業って頑張ってるのに結果が出ないとしんどい。でもAIで作業を分解したら少しラクになった、みたいなことを投稿したい"
+                className="mt-2 w-full resize-y rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+            </label>
+
+            <label className="block text-sm font-bold">
+              整えた投稿文
+              <textarea
+                value={instantPostText}
+                onChange={(event) => setInstantPostText(event.target.value)}
+                rows={9}
+                placeholder="ここに整えた投稿文が入ります。投稿前に自由に修正できます。"
+                className="mt-2 w-full resize-y rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+            </label>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={polishInstantPost}
+              disabled={instantLoading || !instantRawText.trim()}
+              className="rounded-md bg-pink-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-45"
+            >
+              {instantLoading ? "整えています..." : "投稿文を整える"}
+            </button>
+            <button
+              type="button"
+              onClick={() => copyText("instant-post", instantPostText)}
+              disabled={!instantPostText.trim()}
+              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-bold disabled:opacity-45"
+            >
+              {copiedId === "instant-post" ? "コピーしました" : "コピー"}
+            </button>
+            <button
+              type="button"
+              onClick={() => publishToThreads(`instant-${Date.now()}`, instantPostText)}
+              disabled={!instantPostText.trim() || instantPostText.length > 500}
+              className="rounded-md bg-pink-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-45"
+            >
+              今すぐThreadsに投稿
+            </button>
+          </div>
+          <p className="mt-3 text-xs text-slate-500">
+            投稿ボタンは実際のThreadsアカウントに投稿します。予約ではありません。
+          </p>
+        </section>
       ) : null}
 
       {view === "analysis" ? (
