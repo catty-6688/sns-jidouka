@@ -8,6 +8,7 @@ type InstantRequest = {
   character?: string;
   profileHistory?: string;
   personalExperiences?: string;
+  recentOwnPosts?: string;
   tone?: string;
 };
 
@@ -65,6 +66,9 @@ ${pickString(body?.profileHistory) || "副業で試行錯誤した経験があ�
 使える実体験:
 ${pickString(body?.personalExperiences) || "AIで発信や集客の負担を軽くしてきた。"}
 
+最近の自分の投稿:
+${pickString(body?.recentOwnPosts) || "未設定。未設定の場合は自然な話し言葉で、AIっぽく整えすぎない。"}
+
 トーン:
 ${pickString(body?.tone) || "共感系"}
 
@@ -72,6 +76,8 @@ ${pickString(body?.tone) || "共感系"}
 - 120〜220字目安
 - 短文改行で読みやすく
 - ですます調に寄せすぎず、近い距離感
+- 最近の自分の投稿がある場合、言葉選び、改行、語尾、絵文字量、テンションを寄せる
+- 絵文字はゼロにしない。最近の投稿に合わせる。未設定なら0〜2個まで自然に使う
 - 実績は少しだけ自然に入れる。自慢や誇大表現にしない
 - 「すぐ稼げる」表現は避ける
 - 無料相談CTAは入れない。必要なら最後は軽い問いかけにする

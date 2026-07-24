@@ -85,11 +85,59 @@ button {
   color: inherit;
 }
 
+button {
+  transition:
+    transform 120ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    opacity 160ms ease;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
 button,
 input,
 textarea,
 select {
   font: inherit;
+}
+
+button,
+input,
+select {
+  min-height: 44px;
+}
+
+textarea {
+  min-height: 96px;
+}
+
+pre,
+textarea,
+input {
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  main {
+    width: 100%;
+  }
+
+  section,
+  article,
+  details {
+    border-radius: 10px;
+  }
 }
 
 ::selection {

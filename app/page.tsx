@@ -59,6 +59,7 @@ type HistoryItem = {
   profileHistory: string;
   offer: string;
   personalExperiences: string;
+  recentOwnPosts: string;
   researchNotes: string;
   tone: Tone;
   template: Template;
@@ -72,6 +73,7 @@ const threadsTokenStorageKey = "sns-jidouka-threads-token";
 const threadsAuthStorageKey = "sns-jidouka-threads-auth";
 const threadsPostStorageKey = "sns-jidouka-threads-posts";
 const scheduleStorageKey = "sns-jidouka-schedule";
+const scheduledPostStorageKey = "sns-jidouka-scheduled-posts";
 
 const defaultProfile = {
   genre: "AI × 美容 × 副業/SNS集客",
@@ -80,14 +82,16 @@ const defaultProfile = {
   pain:
     "少しでも行動したけどうまくできない人に届ける。すぐ稼げると思っている人、何もやりたくない人、楽して稼ぎたい人は対象外。",
   character:
-    "副業で失敗した経験から、成功とは何かを見つけ、副業で6桁を達成した人。現実はちゃんと言うけれど、突き放さず、一歩を踏み出せるように一緒に整理する相談相手。ですます口調は遠く感じるので避ける。近い距離感で、自然体の話し言葉にする。例: 〜だと思う、〜してみて、〜なんだよね、〜でいい。",
+    "猫っぽい明るいミニキャラのキャティ。AI副業の相談室として、AIを使った発信、作業分解、SNS運用の小さなコツをやさしく伝える。最初から売り込まず、AIって便利そう、少し試してみたいと思ってもらう投稿を中心にする。副業で失敗した経験から、成功とは何かを見つけ、副業で6桁を達成した背景がある。口調は「です・ます」をベースに、自然な話し言葉も少し混ぜる。明るいけれど煽らない。現実はちゃんと言うけれど、突き放さず、一歩を踏み出せるように一緒に整理する相談相手。",
   benchmarkAccounts: "",
   profileHistory:
     "ここにChatGPTで作ったプロフィール・経歴・過去のストーリーをそのまま貼り付けてください。",
   offer:
-    "無料相談への予約。学ぶのは無料だと伝える。AIを教えられる強みは出すが、エステレラに参加して一緒に盛り上げてほしい話は大々的に言わず、無料相談で自然に話すためににおわせる程度にする。",
+    "無料相談への予約は毎回出さない。立ち上げ初期はAIの使い方、発信がラクになる考え方、作業分解、AIでできる小さな改善を中心にして信頼を作る。CTA投稿は週1〜2本だけ。学ぶのは無料だと伝える。エステレラ参加の話は大々的に言わず、無料相談で自然に話すためににおわせる程度にする。",
   personalExperiences:
-    "AIを教えられるのが自分の強み。\n楽して稼ぎたい人より、少しでも行動している人を応援したい。\nMLM集客や副業で疲れている人に、AIを使って発信の負担を軽くする方法を伝えたい。\n美容が好きな人、学びながら自分の方向性を見つけたい人に合うと思っている。\nエステレラは無料で学べる点を大事に伝えたい。",
+    "AIを教えられるのが自分の強み。\nAIで投稿案、構成、キャプション、リサーチ、作業分解がラクになる体験を伝えたい。\n副業で失敗した経験があり、そこから成功とは何かを考えるようになった。\n副業で6桁を達成した経験がある。\n楽して稼ぎたい人より、少しでも行動している人を応援したい。\nMLM集客や副業で疲れている人に、AIを使って発信の負担を軽くする方法を伝えたい。\n美容が好きな人、学びながら自分の方向性を見つけたい人に合うと思っている。",
+  recentOwnPosts:
+    "ここに最近の自分のThreads投稿を5〜10本ほど貼ってください。AI社員と投稿生成が、言葉選び、改行、絵文字量、語尾、テンションを分析して寄せます。",
   researchNotes: ""
 };
 
@@ -118,6 +122,7 @@ export default function Home() {
   const [profileHistory, setProfileHistory] = useState(defaultProfile.profileHistory);
   const [offer, setOffer] = useState(defaultProfile.offer);
   const [personalExperiences, setPersonalExperiences] = useState(defaultProfile.personalExperiences);
+  const [recentOwnPosts, setRecentOwnPosts] = useState(defaultProfile.recentOwnPosts);
   const [researchNotes, setResearchNotes] = useState(defaultProfile.researchNotes);
   const [tone, setTone] = useState<Tone>("やさしい");
   const [template, setTemplate] = useState<Template>("basic");
@@ -135,6 +140,7 @@ export default function Home() {
   const [instantPostText, setInstantPostText] = useState("");
   const [instantLoading, setInstantLoading] = useState(false);
   const [postedIds, setPostedIds] = useState<Record<string, string>>({});
+  const [scheduledIds, setScheduledIds] = useState<Record<string, string>>({});
   const [scheduleStartDate, setScheduleStartDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [postTimes, setPostTimes] = useState(["08:00", "12:30", "20:00", ""]);
   const [bookingUrl, setBookingUrl] = useState("");
@@ -146,6 +152,7 @@ export default function Home() {
   const [error, setError] = useState("");
   const [agentError, setAgentError] = useState("");
   const [notice, setNotice] = useState("");
+  const [actionFeedback, setActionFeedback] = useState("");
   const [copiedId, setCopiedId] = useState("");
 
   const isReady = useMemo(() => genre.trim() && target.trim() && pain.trim(), [genre, target, pain]);
@@ -176,6 +183,7 @@ export default function Home() {
         setProfileHistory(saved.profileHistory || defaultProfile.profileHistory);
         setOffer(saved.offer || defaultProfile.offer);
         setPersonalExperiences(saved.personalExperiences || defaultProfile.personalExperiences);
+        setRecentOwnPosts(saved.recentOwnPosts || defaultProfile.recentOwnPosts);
         setResearchNotes(saved.researchNotes || defaultProfile.researchNotes);
       } catch {
         window.localStorage.removeItem(profileStorageKey);
@@ -228,6 +236,15 @@ export default function Home() {
       }
     }
 
+    const savedScheduledIds = window.localStorage.getItem(scheduledPostStorageKey);
+    if (savedScheduledIds) {
+      try {
+        setScheduledIds(JSON.parse(savedScheduledIds) as Record<string, string>);
+      } catch {
+        window.localStorage.removeItem(scheduledPostStorageKey);
+      }
+    }
+
     const savedSchedule = window.localStorage.getItem(scheduleStorageKey);
     if (savedSchedule) {
       try {
@@ -247,7 +264,13 @@ export default function Home() {
 
   function flash(message: string) {
     setNotice(message);
-    window.setTimeout(() => setNotice(""), 1800);
+    window.setTimeout(() => setNotice(""), 2400);
+  }
+
+  function markAction(id: string, message?: string) {
+    setActionFeedback(id);
+    if (message) flash(message);
+    window.setTimeout(() => setActionFeedback(""), 1600);
   }
 
   function saveProfile() {
@@ -262,10 +285,11 @@ export default function Home() {
         profileHistory,
         offer,
         personalExperiences,
+        recentOwnPosts,
         researchNotes
       })
     );
-    flash("運用プロフィールを保存しました");
+    markAction("profile-save", "運用プロフィールを保存しました");
   }
 
   function resetProfile() {
@@ -277,27 +301,29 @@ export default function Home() {
     setProfileHistory(defaultProfile.profileHistory);
     setOffer(defaultProfile.offer);
     setPersonalExperiences(defaultProfile.personalExperiences);
+    setRecentOwnPosts(defaultProfile.recentOwnPosts);
     setResearchNotes(defaultProfile.researchNotes);
     window.localStorage.removeItem(profileStorageKey);
-    flash("初期設定に戻しました");
+    markAction("profile-reset", "初期設定に戻しました");
   }
 
   async function copyText(id: string, text: string) {
     await navigator.clipboard.writeText(text);
     setCopiedId(id);
+    flash("コピーしました");
     window.setTimeout(() => setCopiedId(""), 1400);
   }
 
   function saveThreadsToken() {
     window.localStorage.setItem(threadsTokenStorageKey, threadsToken.trim());
-    flash("Threadsトークンを保存しました");
+    markAction("threads-token-save", "Threadsトークンを保存しました");
   }
 
   function clearThreadsToken() {
     setThreadsToken("");
     setThreadsStatus("未接続");
     window.localStorage.removeItem(threadsTokenStorageKey);
-    flash("Threadsトークンを消しました");
+    markAction("threads-token-clear", "Threadsトークンを消しました");
   }
 
   function getThreadsRedirectUri() {
@@ -326,7 +352,7 @@ export default function Home() {
         publicUrl: threadsPublicUrl.trim()
       })
     );
-    flash("Threads認証設定を保存しました");
+    markAction("threads-auth-save", "Threads認証設定を保存しました");
   }
 
   async function copyThreadsText(id: string, text: string) {
@@ -368,7 +394,7 @@ export default function Home() {
         `${data.tokenType === "long_lived" ? "長期" : "短期"}アクセストークンを取得して保存しました。`
       );
       setThreadsAuthCode("");
-      flash("Threadsトークンを保存しました");
+      markAction("threads-token-save", "Threadsトークンを保存しました");
     } catch (caught) {
       setThreadsAuthStatus(caught instanceof Error ? caught.message : "アクセストークン取得でエラーが発生しました。");
     }
@@ -379,7 +405,39 @@ export default function Home() {
       scheduleStorageKey,
       JSON.stringify({ scheduleStartDate, postTimes, bookingUrl })
     );
-    flash("投稿カレンダー設定を保存しました");
+    markAction("schedule-save", "投稿作成設定を保存しました");
+  }
+
+  function addToSchedule(id: string, label: string) {
+    const next = { ...scheduledIds };
+    if (next[id]) {
+      delete next[id];
+      setScheduledIds(next);
+      window.localStorage.setItem(scheduledPostStorageKey, JSON.stringify(next));
+      markAction(`schedule-${id}`, "予約済みチェックを外しました");
+      return;
+    }
+
+    next[id] = label;
+    setScheduledIds(next);
+    window.localStorage.setItem(scheduledPostStorageKey, JSON.stringify(next));
+    markAction(`schedule-${id}`, "Threadsで予約済みにしました");
+  }
+
+  function addManyToSchedule(items: { id: string; label: string }[]) {
+    const targets = items.filter((item) => !scheduledIds[item.id]);
+    if (!targets.length) {
+      flash("まだチェックできる投稿がありません");
+      return;
+    }
+
+    const next = { ...scheduledIds };
+    targets.forEach((item) => {
+      next[item.id] = item.label;
+    });
+    setScheduledIds(next);
+    window.localStorage.setItem(scheduledPostStorageKey, JSON.stringify(next));
+    markAction("schedule-all", `${targets.length}件を予約済みにしました`);
   }
 
   function updatePostTime(index: number, value: string) {
@@ -441,7 +499,6 @@ export default function Home() {
             day.theme,
             post.title,
             post.body.replace(/\r?\n/g, "\\n"),
-            bookingUrl,
           ].join("\t");
         })
       )
@@ -456,7 +513,7 @@ export default function Home() {
       [
         "SNS投稿予約を入れる",
         reminderDate,
-        `投稿開始日 ${scheduleStartDate} の2週間前です。7日分の投稿を確認し、予約ツールへ登録してください。予約URL: ${bookingUrl || "未設定"}`
+        `投稿開始日 ${scheduleStartDate} の2週間前です。7日分の投稿を確認し、Threads側で予約投稿を登録してください。`
       ].join("\t")
     ].join("\n");
   }
@@ -482,7 +539,7 @@ export default function Home() {
   }
 
   async function publishToThreads(id: string, text: string) {
-    if (!window.confirm("この投稿をThreadsに投稿します。よろしいですか？")) return;
+    if (!window.confirm("予約ではありません。\nこの投稿は今すぐThreadsに投稿されます。よろしいですか？")) return;
 
     try {
       const response = await fetch("/api/threads/publish", {
@@ -528,6 +585,7 @@ export default function Home() {
           character,
           profileHistory,
           personalExperiences,
+          recentOwnPosts,
           tone
         })
       });
@@ -606,6 +664,7 @@ export default function Home() {
           profileHistory,
           offer,
           personalExperiences,
+          recentOwnPosts,
           researchNotes,
           agentOutputs
         })
@@ -678,6 +737,7 @@ export default function Home() {
           profileHistory,
           offer,
           personalExperiences,
+          recentOwnPosts,
           researchNotes,
           tone,
           template
@@ -701,6 +761,7 @@ export default function Home() {
         profileHistory,
         offer,
         personalExperiences,
+        recentOwnPosts,
         researchNotes,
         tone,
         template,
@@ -728,30 +789,53 @@ export default function Home() {
     setProfileHistory(item.profileHistory || defaultProfile.profileHistory);
     setOffer(item.offer);
     setPersonalExperiences(item.personalExperiences);
+    setRecentOwnPosts(item.recentOwnPosts || defaultProfile.recentOwnPosts);
     setResearchNotes(item.researchNotes);
     setTone(item.tone);
     setTemplate(item.template);
     setResult(item.result);
   }
 
+  const navItems: { id: View; label: string; shortLabel: string }[] = [
+    { id: "dashboard", label: "ダッシュボード", shortLabel: "ホーム" },
+    { id: "profile", label: "素材設定", shortLabel: "素材" },
+    { id: "instant", label: "今すぐ投稿", shortLabel: "今すぐ" },
+    { id: "analysis", label: "AI分析", shortLabel: "分析" },
+    { id: "calendar", label: "投稿カレンダー", shortLabel: "予約" },
+    { id: "history", label: "履歴", shortLabel: "履歴" }
+  ];
+
   return (
-    <main className="mx-auto max-w-7xl px-4 py-6 text-slate-950">
-      <header className="mb-6 border-b border-slate-200 pb-4">
+    <main className="mx-auto max-w-7xl px-3 pb-24 pt-4 text-slate-950 sm:px-4 sm:py-6">
+      <header className="mb-4 border-b border-slate-200 pb-4 sm:mb-6">
         <p className="text-sm font-bold text-pink-600">SNS投稿半自動化ツール</p>
-        <h1 className="mt-1 text-3xl font-bold">Threads運用ダッシュボード</h1>
+        <h1 className="mt-1 text-2xl font-bold sm:text-3xl">Threads運用ダッシュボード</h1>
         <p className="mt-2 text-sm text-slate-600">月4回だけ確認。1回で7日分を作り、修正したら予約・投稿するだけにします。</p>
       </header>
 
-      <nav className="mb-6 grid gap-2 sm:grid-cols-6">
-        <NavButton active={view === "dashboard"} onClick={() => setView("dashboard")}>ダッシュボード</NavButton>
-        <NavButton active={view === "profile"} onClick={() => setView("profile")}>素材設定</NavButton>
-        <NavButton active={view === "instant"} onClick={() => setView("instant")}>今すぐ投稿</NavButton>
-        <NavButton active={view === "analysis"} onClick={() => setView("analysis")}>AI分析</NavButton>
-        <NavButton active={view === "calendar"} onClick={() => setView("calendar")}>投稿カレンダー</NavButton>
-        <NavButton active={view === "history"} onClick={() => setView("history")}>履歴</NavButton>
+      <nav className="mb-6 hidden gap-2 sm:grid sm:grid-cols-6">
+        {navItems.map((item) => (
+          <NavButton key={item.id} active={view === item.id} onClick={() => setView(item.id)}>
+            {item.label}
+          </NavButton>
+        ))}
       </nav>
 
-      {notice ? <p className="mb-4 rounded-md bg-green-50 px-4 py-3 text-sm text-green-700">{notice}</p> : null}
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-[#0a000c]/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] pt-2 backdrop-blur sm:hidden">
+        <div className="grid grid-cols-6 gap-1">
+          {navItems.map((item) => (
+            <MobileNavButton key={item.id} active={view === item.id} onClick={() => setView(item.id)}>
+              {item.shortLabel}
+            </MobileNavButton>
+          ))}
+        </div>
+      </nav>
+
+      {notice ? (
+        <div className="fixed left-3 right-3 top-3 z-50 mx-auto max-w-md rounded-lg border border-pink-200 bg-pink-600 px-4 py-3 text-center text-sm font-bold text-white shadow-xl sm:left-auto sm:right-6 sm:top-6">
+          {notice}
+        </div>
+      ) : null}
 
       {view === "dashboard" ? (
         <section className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
@@ -797,14 +881,26 @@ export default function Home() {
             className="w-full rounded-md border border-slate-300 px-3 py-2"
           />
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={saveThreadsToken} className="rounded-md bg-pink-600 px-4 py-2 text-sm font-bold text-white">
-              保存
+            <button
+              type="button"
+              onClick={saveThreadsToken}
+              className={`rounded-md px-4 py-2 text-sm font-bold text-white transition ${
+                actionFeedback === "threads-token-save" ? "bg-green-500" : "bg-pink-600 active:scale-[0.98]"
+              }`}
+            >
+              {actionFeedback === "threads-token-save" ? "保存済み" : "保存"}
             </button>
             <button type="button" onClick={checkThreadsConnection} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-bold">
               接続確認
             </button>
-            <button type="button" onClick={clearThreadsToken} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-bold">
-              消す
+            <button
+              type="button"
+              onClick={clearThreadsToken}
+              className={`rounded-md border border-slate-300 px-4 py-2 text-sm font-bold transition active:scale-[0.98] ${
+                actionFeedback === "threads-token-clear" ? "bg-green-500 text-white" : ""
+              }`}
+            >
+              {actionFeedback === "threads-token-clear" ? "消しました" : "消す"}
             </button>
           </div>
         </div>
@@ -835,9 +931,11 @@ export default function Home() {
             <button
               type="button"
               onClick={saveThreadsAuthSettings}
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-bold"
+              className={`rounded-md border border-slate-300 px-4 py-2 text-sm font-bold transition active:scale-[0.98] ${
+                actionFeedback === "threads-auth-save" ? "bg-green-500 text-white" : ""
+              }`}
             >
-              認証設定を保存
+              {actionFeedback === "threads-auth-save" ? "保存済み" : "認証設定を保存"}
             </button>
             <button
               type="button"
@@ -928,13 +1026,35 @@ export default function Home() {
             <p className="mt-1 text-sm text-slate-600">普段はここだけ確認すればOKです。</p>
           </div>
           <div className="flex gap-2">
-            <button type="button" onClick={saveProfile} className="rounded-md bg-pink-600 px-4 py-2 text-sm font-bold text-white">
-              保存
+            <button
+              type="button"
+              onClick={saveProfile}
+              className={`rounded-md px-4 py-2 text-sm font-bold text-white transition ${
+                actionFeedback === "profile-save" ? "bg-green-500" : "bg-pink-600 active:scale-[0.98]"
+              }`}
+            >
+              {actionFeedback === "profile-save" ? "保存済み" : "保存"}
             </button>
-            <button type="button" onClick={resetProfile} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-bold">
-              初期設定に戻す
+            <button
+              type="button"
+              onClick={resetProfile}
+              className={`rounded-md border border-slate-300 px-4 py-2 text-sm font-bold transition active:scale-[0.98] ${
+                actionFeedback === "profile-reset" ? "bg-green-500 text-white" : ""
+              }`}
+            >
+              {actionFeedback === "profile-reset" ? "戻しました" : "初期設定に戻す"}
             </button>
           </div>
+        </div>
+
+        <div className="mt-4 rounded-lg border border-pink-200 bg-pink-50 p-3">
+          <TextArea
+            label="導線ルール（無料相談は控えめ）"
+            value={offer}
+            onChange={setOffer}
+            rows={5}
+            help="ここが無料相談に誘導する頻度と温度感の設定です。通常投稿では誘導せず、CTA投稿だけ週1〜2本まで自然に使います。"
+          />
         </div>
 
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -954,7 +1074,13 @@ export default function Home() {
             help="@IDやURLを1行に1つ。AI社員はここを参考に、言葉ではなく型だけを抽出します。"
           />
           <TextArea label="使える実体験・思想メモ" value={personalExperiences} onChange={setPersonalExperiences} rows={5} />
-          <TextArea label="CTA・無料相談の導線" value={offer} onChange={setOffer} rows={4} />
+          <TextArea
+            label="最近の自分の投稿コピペ欄"
+            value={recentOwnPosts}
+            onChange={setRecentOwnPosts}
+            rows={8}
+            help="自分のThreads投稿を5〜10本貼ると、AI社員が言葉選び・改行・絵文字量・語尾を分析して、あなたっぽさを投稿生成に反映します。"
+          />
           <TextArea
             label="直近リサーチ・参考投稿メモ"
             value={researchNotes}
@@ -1126,12 +1252,23 @@ export default function Home() {
         <div className="mt-4 rounded-md border border-slate-200 p-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h3 className="font-bold">投稿カレンダー設定</h3>
-              <p className="mt-1 text-sm text-slate-600">1回で7日分を作成。投稿開始日の2週間前に予約催促できる形にします。</p>
+              <h3 className="font-bold">投稿作成の基本設定</h3>
+              <p className="mt-1 text-sm text-slate-600">
+                ここは自動予約ではなく、7日分を作る開始日とThreadsで手動予約するときの目安時間です。
+              </p>
             </div>
-            <button type="button" onClick={saveSchedule} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-bold">
-              カレンダー設定を保存
+            <button
+              type="button"
+              onClick={saveSchedule}
+              className={`rounded-md border border-slate-300 px-4 py-2 text-sm font-bold transition active:scale-[0.98] ${
+                actionFeedback === "schedule-save" ? "bg-green-500 text-white" : ""
+              }`}
+            >
+              {actionFeedback === "schedule-save" ? "保存済み" : "設定を保存"}
             </button>
+          </div>
+          <div className="mt-3 rounded-md border border-pink-200 bg-pink-50 px-3 py-2 text-sm font-bold text-pink-700">
+            投稿は自動では出ません。7日分ができたら、下の「Threads予約作業リスト」から本文をコピーしてThreads側で予約してください。
           </div>
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
             <label className="block">
@@ -1143,16 +1280,12 @@ export default function Home() {
                 className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2"
               />
             </label>
-            <label className="block">
-              <span className="text-sm font-bold">相談予約URL</span>
-              <input
-                value={bookingUrl}
-                onChange={(event) => setBookingUrl(event.target.value)}
-                placeholder="予約ツールのURL"
-                className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2"
-              />
-            </label>
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              <p className="font-bold text-slate-800">今の運用</p>
+              <p className="mt-1">AI投稿中心。無料相談への誘導は週1〜2本だけに抑えます。</p>
+            </div>
           </div>
+          <p className="mt-3 text-sm font-bold">Threadsで予約するときの目安時間</p>
           <div className="mt-3 grid gap-2 sm:grid-cols-4">
             {postTimes.map((time, index) => (
               <label key={index} className="block">
@@ -1182,7 +1315,7 @@ export default function Home() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-bold">生成結果</h2>
-            <p className="mt-1 text-sm text-slate-600">カレンダー表示で投稿日と投稿時間を確認できます。</p>
+            <p className="mt-1 text-sm text-slate-600">投稿日と投稿時間を確認し、Threads側で予約したものに✅を付けられます。</p>
           </div>
           <button
             type="button"
@@ -1190,7 +1323,7 @@ export default function Home() {
             disabled={!result?.weekly?.length}
             className="rounded-md border border-slate-300 px-4 py-2 text-sm font-bold disabled:opacity-40"
           >
-            {copiedId === "calendar-text" ? "コピーしました" : "予約ツール用にコピー"}
+            {copiedId === "calendar-text" ? "コピーしました" : "一覧をコピー"}
           </button>
           <button
             type="button"
@@ -1202,18 +1335,31 @@ export default function Home() {
         </div>
         {loading ? <p className="mt-4 text-slate-600">投稿文を整えています。1週間分なので少し時間がかかります。</p> : null}
         {!result && !loading ? <p className="mt-4 text-slate-600">ここに生成結果が表示されます。</p> : null}
+        {Object.keys(scheduledIds).length ? (
+          <div className="mt-4 rounded-md border border-slate-200 bg-pink-50 p-3">
+            <h3 className="font-bold">✅ 予約済み一覧</h3>
+            <p className="mt-1 text-xs text-slate-600">Threads側で予約できた投稿のチェック一覧です。自動投稿ではありません。</p>
+            <ul className="mt-2 space-y-1 text-sm">
+              {Object.entries(scheduledIds).map(([id, label]) => (
+                <li key={id}>✅ {label}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         {result?.checkpoints?.length ? <CheckpointPanel checkpoints={result.checkpoints} /> : null}
         {result?.weekly?.length ? (
           <WeeklyPlan
             weekly={result.weekly}
             copiedId={copiedId}
             postedIds={postedIds}
+            scheduledIds={scheduledIds}
             scheduleStartDate={scheduleStartDate}
             postTimes={postTimes}
-            bookingUrl={bookingUrl}
             onCopy={copyText}
             onPublish={publishToThreads}
             onPublishAll={publishManyToThreads}
+            onSchedule={addToSchedule}
+            onScheduleAll={addManyToSchedule}
             onEditTitle={updateWeeklyPostTitle}
             onEditBody={updateWeeklyPostBody}
           />
@@ -1263,6 +1409,20 @@ function NavButton({ active, onClick, children }: { active: boolean; onClick: ()
       type="button"
       onClick={onClick}
       className={`rounded-md border px-4 py-3 text-sm font-bold ${
+        active ? "border-pink-600 bg-pink-600 text-white" : "border-slate-200 bg-white text-slate-700"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function MobileNavButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`min-h-12 rounded-md border px-1 text-[11px] font-bold ${
         active ? "border-pink-600 bg-pink-600 text-white" : "border-slate-200 bg-white text-slate-700"
       }`}
     >
@@ -1332,7 +1492,7 @@ function ProgressPanel({ elapsedSeconds }: { elapsedSeconds: number }) {
       : elapsedSeconds < 60
         ? "7日分のテーマと本文を組み立てています"
         : elapsedSeconds < 100
-          ? "投稿ごとの分析とCTAを整えています"
+          ? "投稿ごとの分析と導線の温度感を整えています"
           : "まだ作成中です。長い場合はOpenAI APIの応答待ちです";
 
   return (
@@ -1373,30 +1533,34 @@ function WeeklyPlan({
   weekly,
   copiedId,
   postedIds,
+  scheduledIds,
   scheduleStartDate,
   postTimes,
-  bookingUrl,
   onCopy,
   onPublish,
   onPublishAll,
+  onSchedule,
+  onScheduleAll,
   onEditTitle,
   onEditBody
 }: {
   weekly: WeeklyDay[];
   copiedId: string;
   postedIds: Record<string, string>;
+  scheduledIds: Record<string, string>;
   scheduleStartDate: string;
   postTimes: string[];
-  bookingUrl: string;
   onCopy: (id: string, text: string) => void;
   onPublish: (id: string, text: string) => void;
   onPublishAll: (items: { id: string; text: string }[]) => void;
+  onSchedule: (id: string, label: string) => void;
+  onScheduleAll: (items: { id: string; label: string }[]) => void;
   onEditTitle: (dayIndex: number, postIndex: number, title: string) => void;
   onEditBody: (dayIndex: number, postIndex: number, body: string) => void;
 }) {
   const events = weekly.flatMap((day, dayIndex) =>
     day.posts.map((post, postIndex) => ({
-      id: `weekly-${dayIndex}-${postIndex}`,
+      id: `weekly-${scheduleStartDate}-${dayIndex}-${postIndex}`,
       date: addDays(scheduleStartDate, dayIndex),
       time: postTimes[postIndex] || "未設定",
       day,
@@ -1407,38 +1571,186 @@ function WeeklyPlan({
   );
   const calendarDays = buildMonthCalendar(scheduleStartDate);
   const monthLabel = formatMonthLabel(scheduleStartDate);
+  const scheduleItems = events.map((event) => ({
+    id: event.id,
+    label: `${event.date} ${event.time} ${event.post.title}`
+  }));
 
   return (
     <div className="mt-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-lg font-bold">{monthLabel}</h3>
-          <p className="text-sm text-slate-600">月表示 / 投稿予定がある日だけ帯で表示</p>
+          <p className="text-sm text-slate-600">予定時刻はThreads側で手動予約するときの目安です。</p>
         </div>
-        <button
-          type="button"
-          onClick={() =>
-            onPublishAll(
-              events.map((event) => ({
-                id: event.id,
-                text: event.post.body
-              }))
-            )
-          }
-          className="rounded-md bg-pink-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-45"
-          disabled={events.every((event) => postedIds[event.id])}
-        >
-          未投稿をまとめて投稿
-        </button>
+        <div className="grid gap-2 sm:flex">
+          <button
+            type="button"
+            onClick={() => onScheduleAll(scheduleItems)}
+            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-bold disabled:opacity-45"
+            disabled={events.every((event) => scheduledIds[event.id])}
+          >
+            未チェックをまとめて✅にする
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              onPublishAll(
+                events.map((event) => ({
+                  id: event.id,
+                  text: event.post.body
+                }))
+              )
+            }
+            className="rounded-md bg-pink-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-45"
+            disabled={events.every((event) => postedIds[event.id])}
+          >
+            未投稿を今すぐまとめて投稿
+          </button>
+        </div>
       </div>
-      <div className="grid grid-cols-7 border-l border-t border-slate-200 text-center text-xs font-bold text-slate-600">
+      <p className="mb-3 rounded-md border border-pink-200 bg-pink-50 px-3 py-2 text-sm font-bold text-pink-700">
+        7日分ができたら、下の一覧を上から順にコピーしてThreads側で予約してください。予約が終わった投稿に✅を付けて管理できます。
+      </p>
+      <section className="mb-4 rounded-lg border border-slate-200 bg-white p-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 className="font-bold">Threads予約作業リスト</h3>
+            <p className="mt-1 text-xs text-slate-600">
+              この一覧は手動予約の確認用です。ここで✅を付けても自動投稿はされません。
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onScheduleAll(scheduleItems)}
+            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-bold disabled:opacity-45"
+            disabled={events.every((event) => scheduledIds[event.id])}
+          >
+            全部✅チェックする
+          </button>
+        </div>
+        <div className="mt-3 space-y-2">
+          {events.map((event) => {
+            const isScheduled = Boolean(scheduledIds[event.id]);
+            return (
+              <article
+                key={`reservation-${event.id}`}
+                className={`rounded-md border p-3 ${
+                  isScheduled ? "border-green-400 bg-green-500/10" : "border-slate-200 bg-white"
+                }`}
+              >
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-pink-600">
+                      {event.date} {event.time} / {event.day.day}
+                    </p>
+                    <h4 className="mt-1 break-words font-bold">{event.post.title}</h4>
+                    <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600">
+                      {event.post.body}
+                    </p>
+                  </div>
+                  <div className="grid shrink-0 grid-cols-2 gap-2 lg:w-44 lg:grid-cols-1">
+                    <button
+                      type="button"
+                      onClick={() => onCopy(`reserve-copy-${event.id}`, event.post.body)}
+                      className="rounded-md border border-slate-300 px-3 py-3 text-sm font-bold"
+                    >
+                      {copiedId === `reserve-copy-${event.id}` ? "コピー済み" : "本文コピー"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onSchedule(event.id, `${event.date} ${event.time} ${event.post.title}`)}
+                      className={`rounded-md px-3 py-3 text-sm font-bold ${
+                        isScheduled ? "bg-green-500 text-white" : "border border-slate-300"
+                      }`}
+                    >
+                      {isScheduled ? "✅ 予約済み" : "Threadsで予約できた"}
+                    </button>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+      <div className="space-y-3 sm:hidden">
+        {events.map((event) => (
+          <article key={`mobile-${event.id}`} className="rounded-lg border border-slate-200 bg-white p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold text-pink-600">
+                  {event.date} {event.time}
+                </p>
+                <h4 className="mt-1 font-bold">{event.post.title}</h4>
+                <p className="mt-1 text-xs text-slate-600">{event.day.theme}</p>
+                {scheduledIds[event.id] ? (
+                  <p className="mt-2 inline-flex rounded-full bg-green-500 px-2 py-1 text-xs font-bold text-white">
+                    ✅ 予約済み
+                  </p>
+                ) : null}
+              </div>
+              <span className="shrink-0 rounded-full bg-pink-600 px-2 py-1 text-xs font-bold text-white">
+                {event.postIndex + 1}
+              </span>
+            </div>
+            <label className="mt-3 block text-xs font-bold text-slate-600">
+              タイトル
+              <input
+                type="text"
+                value={event.post.title}
+                onChange={(changeEvent) =>
+                  onEditTitle(event.dayIndex, event.postIndex, changeEvent.target.value)
+                }
+                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm font-bold"
+              />
+            </label>
+            <label className="mt-3 block text-xs font-bold text-slate-600">
+              投稿文（ここで修正できます）
+              <textarea
+                value={event.post.body}
+                onChange={(changeEvent) =>
+                  onEditBody(event.dayIndex, event.postIndex, changeEvent.target.value)
+                }
+                rows={6}
+                className="mt-1 w-full resize-y rounded border border-slate-300 p-3 font-sans text-sm leading-6"
+              />
+            </label>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => onSchedule(event.id, `${event.date} ${event.time} ${event.post.title}`)}
+                disabled={Boolean(scheduledIds[event.id])}
+                className="col-span-2 rounded-md border border-slate-300 px-3 py-3 text-sm font-bold disabled:opacity-45"
+              >
+                {scheduledIds[event.id] ? "✅ 予約済み" : "Threadsで予約できた"}
+              </button>
+              <button
+                type="button"
+                onClick={() => onCopy(event.id, event.post.body)}
+                className="rounded-md border border-slate-300 px-3 py-3 text-sm font-bold"
+              >
+                {copiedId === event.id ? "コピー済み" : "コピー"}
+              </button>
+              <button
+                type="button"
+                onClick={() => onPublish(event.id, event.post.body)}
+                disabled={Boolean(postedIds[event.id])}
+                className="rounded-md bg-pink-600 px-3 py-3 text-sm font-bold text-white disabled:opacity-45"
+              >
+                {postedIds[event.id] ? "投稿済み" : "今すぐ投稿"}
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+      <div className="hidden grid-cols-7 border-l border-t border-slate-200 text-center text-xs font-bold text-slate-600 sm:grid">
         {["日", "月", "火", "水", "木", "金", "土"].map((weekday) => (
           <div key={weekday} className="border-b border-r border-slate-200 px-2 py-2">
             {weekday}
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-7 border-l border-slate-200">
+      <div className="hidden grid-cols-7 border-l border-slate-200 sm:grid">
         {calendarDays.map((calendarDay) => {
           const dayEvents = events.filter((event) => event.date === calendarDay.date);
           return (
@@ -1463,6 +1775,7 @@ function WeeklyPlan({
                   <details key={event.id} className="rounded bg-pink-600/90 px-2 py-1 text-left text-xs text-white">
                     <summary className="cursor-pointer list-none">
                       <span className="font-bold">{event.time}</span> {event.post.title}
+                      {scheduledIds[event.id] ? <span className="ml-1">✅</span> : null}
                     </summary>
                     <div className="mt-2 rounded bg-black/20 p-2">
                       <p className="font-bold">{event.day.theme}</p>
@@ -1488,8 +1801,16 @@ function WeeklyPlan({
                           className="mt-1 w-full resize-y rounded border border-white/30 bg-black/30 p-2 font-sans text-xs leading-5 text-white outline-none focus:border-white"
                         />
                       </label>
-                      <p className="mt-2">予約URL: {bookingUrl || "未設定"}</p>
+                      <p className="mt-2 text-[11px] text-white/75">今すぐ投稿ボタンは予約ではなく、押した瞬間に投稿されます。</p>
                       <div className="mt-2 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onSchedule(event.id, `${event.date} ${event.time} ${event.post.title}`)}
+                          disabled={Boolean(scheduledIds[event.id])}
+                          className="rounded border border-white/40 px-2 py-1 font-bold disabled:opacity-45"
+                        >
+                          {scheduledIds[event.id] ? "✅ 予約済み" : "Threadsで予約できた"}
+                        </button>
                         <button
                           type="button"
                           onClick={() => onCopy(event.id, event.post.body)}
@@ -1503,7 +1824,7 @@ function WeeklyPlan({
                           disabled={Boolean(postedIds[event.id])}
                           className="rounded border border-white/40 px-2 py-1 font-bold disabled:opacity-45"
                         >
-                          {postedIds[event.id] ? "投稿済み" : "投稿"}
+                          {postedIds[event.id] ? "投稿済み" : "今すぐ投稿"}
                         </button>
                       </div>
                     </div>

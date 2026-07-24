@@ -14,6 +14,7 @@ type GenerateRequest = {
   profileHistory?: string;
   offer?: string;
   personalExperiences?: string;
+  recentOwnPosts?: string;
   researchNotes?: string;
   tone: "やさしい" | "煽り系" | "共感系" | "プロっぽい";
   template: "basic" | "education" | "story";
@@ -59,9 +60,9 @@ type Checkpoint = {
 };
 
 const templateLabels: Record<GenerateRequest["template"], string> = {
-  basic: "王道テンプレ。問題提起、気づき、解決策、CTAの順で書く。",
+  basic: "王道テンプレ。問題提起、気づき、AIでできる小さな一歩、軽い問いの順で書く。毎回CTAにはしない。",
   education: "教育テンプレ。初心者が学べる小さなノウハウを中心に書く。",
-  story: "ストーリーテンプレ。過去の失敗や気づきから自然にCTAへつなげる。"
+  story: "ストーリーテンプレ。過去の失敗や気づきから、AIでラクになった変化へつなげる。毎回CTAにはしない。"
 };
 
 function pickString(value: unknown) {
@@ -80,6 +81,7 @@ function validateBody(body: unknown): GenerateRequest | null {
   const profileHistory = pickString(data.profileHistory);
   const offer = pickString(data.offer);
   const personalExperiences = pickString(data.personalExperiences);
+  const recentOwnPosts = pickString(data.recentOwnPosts);
   const researchNotes = pickString(data.researchNotes);
   const tone = pickString(data.tone) as GenerateRequest["tone"];
   const template = pickString(data.template) as GenerateRequest["template"];
@@ -101,6 +103,7 @@ function validateBody(body: unknown): GenerateRequest | null {
     profileHistory,
     offer,
     personalExperiences,
+    recentOwnPosts,
     researchNotes,
     tone,
     template
@@ -176,9 +179,12 @@ ${body.benchmarkAccounts || "未設定。参考にしたいアカウントがあ
 ${body.profileHistory || "未設定。肩書き、過去の失敗、転機、実績、なぜ今この発信をしているかがあれば入れる。"}
 投稿トーン: ${body.tone}
 テンプレ: ${templateLabels[body.template]}
-CTA/導線: ${body.offer || "無料相談への予約。LPや相談予約ページが未確定の場合は、無料相談に自然につなげる。"}
+CTA/導線: ${body.offer || "無料相談は毎回出さない。立ち上げ初期はAIの使い方、発信の負担軽減、作業分解の投稿を中心にして、CTAは週1〜2本だけ自然に入れる。"}
 使える実体験・思想・言葉:
 ${body.personalExperiences || "具体的な体験が不足している箇所は必ず【ここに体験】と書く。"}
+
+最近の自分の投稿:
+${body.recentOwnPosts || "未設定。未設定の場合は、自然な日本語で作るが、過度に整いすぎたAI文体は避ける。"}
 
 参考リサーチ:
 ${body.researchNotes || "直近リサーチがないため、構成パターンは一般的なSNS投稿の型から作る。"}
@@ -191,18 +197,19 @@ ${body.researchNotes || "直近リサーチがないため、構成パターン�
 ${base}
 
 目的:
-- 全投稿で売り込まない。通常投稿で信頼・共感・思想を育て、CTA投稿で無料相談につなげる
-- エステレラへの参加は大々的に言わず、学べる場所・一緒に動ける場所がある程度ににおわせる
-- AIを教えられる強みを出す
+- 立ち上げ初期は無料相談にすぐ引き込まない。AIについての投稿で信頼・共感・興味を育てる
+- AIの使い方、発信の作業分解、投稿作成、リサーチ、キャプション作成、時短、苦手克服を中心テーマにする
+- エステレラへの参加は大々的に言わない。無料相談CTAも控えめにする
+- AIを教えられる強みを、ノウハウ・実例・気づきとして出す
 - 「すぐ稼ぎたい」「何もしたくない」「楽して稼ぎたい」人は対象外だと自然に伝える
 - MLM集客に疲れた人、副業でうまくいかなかった人、美容好き、自分の方向性を知りたい人に届くようにする
 
 作成ルール:
 - 7日分を作る
 - 各日3投稿に絞る
-- 各日の3投稿は「通常投稿2本 + CTA投稿1本」を目安にする
+- 各日の3投稿は「AIノウハウ投稿1本 + 共感/思想投稿1本 + 体験/小さな気づき投稿1本」を目安にする
 - 通常投稿には無料相談への直接誘導を入れない。読者の共感、保存、返信、信頼形成を目的にする
-- CTA投稿だけ無料相談に自然につなげる
+- 無料相談CTAは週1〜2本だけにする。入れる日は明確にCTA投稿として自然につなげる
 - Threads本文は短め。1投稿120〜220字を目安にする
 - 1投稿1メッセージ。長い説明、詰め込み、説教感を避ける
 - 1〜2行目で引っかかりを作り、本文は短文改行で読みやすくする
@@ -213,8 +220,13 @@ ${base}
 - 各投稿に、参考にした型と移した要素を1行で書く
 - 投稿評価として、新規性・属人性・専門性・興味付けをそれぞれ短く採点コメントする
 - 誇大表現、断定、簡単に稼げる表現は避ける
-- CTAは毎回入れない。7日分21投稿のうち、無料相談CTAは最大5〜7本に抑える
+- CTAは毎回入れない。7日分21投稿のうち、無料相談CTAは最大2本に抑える
 - ctaフィールドには、通常投稿なら「なし」または「返信を促す軽い問い」を入れる。CTA投稿だけ無料相談導線を書く
+- 通常投稿の最後は「あなたはどこで止まっていますか？」のような軽い問い、または余韻で終える
+- AI投稿は具体例を入れる。例: 投稿ネタ出し、文章のたたき台、プロフィール整理、リサーチ、キャプション改善、作業手順化
+- 最近の自分の投稿がある場合、言葉選び、改行、語尾、絵文字量、テンションを分析して寄せる
+- 絵文字はゼロにしない。最近の投稿に合わせる。未設定なら1投稿0〜2個まで自然に使う
+- 絵文字は文末や感情の補助だけに使い、装飾しすぎない
 - 投稿前に人が確認する前提なので、承認しやすい粒度でまとめる
 
 確認は月4回だけにする。1回の確認で7日分をまとめて確定できるように、checkpointsを4つ作る:
@@ -268,12 +280,15 @@ ${base}
 条件:
 - Threads投稿を3本
 - X投稿を3本
-- 通常投稿2本、CTA投稿1本の比率にする
+- AIノウハウ投稿2本、共感/体験投稿1本の比率にする
 - 通常投稿には無料相談への直接誘導を入れない
+- 無料相談CTAは必要な時だけ。初期運用では入れない日があってよい
 - 読みやすく改行済み
 - 過度な誇大表現や断定は避ける
 - X投稿は日本語で280文字以内を目安
 - Threads投稿は短め。120〜220字を目安に、スマホで読みやすい短文改行
+- 最近の自分の投稿がある場合、言葉選び、改行、語尾、絵文字量、テンションを分析して寄せる
+- 絵文字はゼロにしない。未設定なら1投稿0〜2個まで自然に使う
 - ハッシュタグは必要な場合のみ最大2個
 
 次のJSON形式だけで返してください。
