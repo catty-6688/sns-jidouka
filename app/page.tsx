@@ -13,7 +13,7 @@ type Template = "basic" | "education" | "story";
 type Mode = "single" | "weekly";
 type AgentId = "research" | "buzz" | "account" | "planning" | "writing";
 type View = "dashboard" | "profile" | "instant" | "analysis" | "buzz" | "calendar" | "history";
-type XSortKey = "buzzScore" | "impressionCount" | "likeCount" | "repostCount" | "engagementRate" | "postedAt";
+type XSortKey = "buzzScore" | "bookmarkCount" | "impressionCount" | "likeCount" | "repostCount" | "engagementRate" | "postedAt";
 type XConnectionStatus = {
   provider: string;
   mode: "api" | "mock";
@@ -103,6 +103,7 @@ const defaultXSearchSetting: XSearchSetting = {
   periodDays: 7,
   minimumImpressions: 0,
   minimumEngagements: 20,
+  minimumBookmarks: 0,
   minimumLikes: 0,
   minimumReposts: 0,
   fetchLimit: 15,
@@ -332,6 +333,7 @@ export default function Home() {
             ...setting,
             minimumImpressions: setting.minimumImpressions ?? defaultXSearchSetting.minimumImpressions,
             minimumEngagements: setting.minimumEngagements ?? defaultXSearchSetting.minimumEngagements,
+            minimumBookmarks: setting.minimumBookmarks ?? defaultXSearchSetting.minimumBookmarks,
             minimumLikes: setting.minimumLikes ?? defaultXSearchSetting.minimumLikes
           }));
           setXSearchSettings(normalized);
@@ -1671,6 +1673,7 @@ export default function Home() {
                   onClick={() => {
                     updateActiveXSearchSetting("minimumImpressions", 0);
                     updateActiveXSearchSetting("minimumEngagements", 0);
+                    updateActiveXSearchSetting("minimumBookmarks", 0);
                     updateActiveXSearchSetting("minimumLikes", 0);
                     updateActiveXSearchSetting("minimumReposts", 0);
                     updateActiveXSearchSetting("fetchLimit", 30);
@@ -1745,6 +1748,11 @@ export default function Home() {
                     onChange={(value) => updateActiveXSearchSetting("periodDays", value)}
                   />
                   <NumberInput
+                    label="最低保存数（補助）"
+                    value={activeXSearchSetting.minimumBookmarks ?? defaultXSearchSetting.minimumBookmarks}
+                    onChange={(value) => updateActiveXSearchSetting("minimumBookmarks", value)}
+                  />
+                  <NumberInput
                     label="最低表示数（補助）"
                     value={activeXSearchSetting.minimumImpressions ?? defaultXSearchSetting.minimumImpressions}
                     onChange={(value) => updateActiveXSearchSetting("minimumImpressions", value)}
@@ -1787,6 +1795,7 @@ export default function Home() {
                       className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
                     >
                       <option value="buzzScore">バズ度</option>
+                      <option value="bookmarkCount">保存数</option>
                       <option value="impressionCount">表示数</option>
                       <option value="likeCount">いいね数</option>
                       <option value="repostCount">リポスト数</option>
@@ -2038,6 +2047,7 @@ function XTrendingPostCard({
 }) {
   const engagementLabel = post.engagementRate === undefined ? "不明" : `${post.engagementRate}%`;
   const impressionLabel = typeof post.impressionCount === "number" ? post.impressionCount.toLocaleString("ja-JP") : "不明";
+  const bookmarkLabel = typeof post.bookmarkCount === "number" ? post.bookmarkCount.toLocaleString("ja-JP") : "不明";
   const riskLabel = analysisResult?.analysis.riskLevel || "未分析";
 
   return (
@@ -2046,6 +2056,7 @@ function XTrendingPostCard({
         <div className="min-w-0">
           <div className="flex flex-wrap gap-2 text-xs font-bold">
             <span className="rounded-full bg-pink-100 px-2 py-1 text-pink-700">バズ度 {post.buzzScore}</span>
+            <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">保存 {bookmarkLabel}</span>
             <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">表示 {impressionLabel}</span>
             <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">いいね {post.likeCount}</span>
             <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">リポスト {post.repostCount}</span>

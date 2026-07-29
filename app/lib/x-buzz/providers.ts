@@ -16,6 +16,7 @@ type XApiTweet = {
     like_count?: number;
     quote_count?: number;
     impression_count?: number;
+    bookmark_count?: number;
   };
   attachments?: {
     media_keys?: string[];
@@ -70,6 +71,7 @@ const mockPosts = [
     replyCount: 86,
     quoteCount: 41,
     impressionCount: 214000,
+    bookmarkCount: 520,
     authorFollowers: 23800,
     hasMedia: false
   },
@@ -83,6 +85,7 @@ const mockPosts = [
     replyCount: 52,
     quoteCount: 28,
     impressionCount: 108000,
+    bookmarkCount: 230,
     authorFollowers: 11200,
     hasMedia: false
   },
@@ -96,6 +99,7 @@ const mockPosts = [
     replyCount: 73,
     quoteCount: 36,
     impressionCount: 166000,
+    bookmarkCount: 410,
     authorFollowers: 18400,
     hasMedia: true
   },
@@ -109,6 +113,7 @@ const mockPosts = [
     replyCount: 39,
     quoteCount: 16,
     impressionCount: 76000,
+    bookmarkCount: 170,
     authorFollowers: 8200,
     hasMedia: false
   },
@@ -122,6 +127,7 @@ const mockPosts = [
     replyCount: 109,
     quoteCount: 65,
     impressionCount: 298000,
+    bookmarkCount: 760,
     authorFollowers: 35600,
     hasMedia: false
   }
@@ -158,6 +164,7 @@ export class MockXProvider implements XPostProvider {
           replyCount: post.replyCount,
           quoteCount: post.quoteCount,
           impressionCount: post.impressionCount,
+          bookmarkCount: post.bookmarkCount,
           buzzScore: metrics.buzzScore,
           engagementRate: metrics.engagementRate,
           impressionEngagementRate: metrics.impressionEngagementRate,
@@ -223,6 +230,7 @@ export class XApiProvider implements XPostProvider {
           replyCount: metrics.reply_count || 0,
           quoteCount: metrics.quote_count || 0,
           impressionCount: metrics.impression_count,
+          bookmarkCount: metrics.bookmark_count,
           authorFollowers: user?.public_metrics?.followers_count
         };
         const calculated = calculateBuzzMetrics(postMetrics);
@@ -242,6 +250,7 @@ export class XApiProvider implements XPostProvider {
           replyCount: postMetrics.replyCount,
           quoteCount: postMetrics.quoteCount,
           impressionCount: postMetrics.impressionCount,
+          bookmarkCount: postMetrics.bookmarkCount,
           buzzScore: calculated.buzzScore,
           engagementRate: calculated.engagementRate,
           impressionEngagementRate: calculated.impressionEngagementRate,

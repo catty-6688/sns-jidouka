@@ -9,6 +9,7 @@ export type XSearchSetting = {
   periodDays: number;
   minimumImpressions: number;
   minimumEngagements: number;
+  minimumBookmarks: number;
   minimumLikes: number;
   minimumReposts: number;
   fetchLimit: number;
@@ -40,6 +41,7 @@ export type XTrendingPost = {
   replyCount: number;
   quoteCount: number;
   impressionCount?: number;
+  bookmarkCount?: number;
   buzzScore: number;
   engagementRate?: number;
   impressionEngagementRate?: number;

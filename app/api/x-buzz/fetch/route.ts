@@ -28,6 +28,7 @@ function validateSetting(value: unknown): XSearchSetting | null {
     periodDays: pickNumber(data.periodDays, 7),
     minimumImpressions: pickNumber(data.minimumImpressions, 0),
     minimumEngagements: pickNumber(data.minimumEngagements, 20),
+    minimumBookmarks: pickNumber(data.minimumBookmarks, 0),
     minimumLikes: pickNumber(data.minimumLikes, 0),
     minimumReposts: pickNumber(data.minimumReposts, 0),
     fetchLimit: Math.min(Math.max(pickNumber(data.fetchLimit, 10), 1), 50),
@@ -52,9 +53,11 @@ export async function POST(request: Request) {
         const passesImpressions =
           setting.minimumImpressions <= 0 ||
           (typeof post.impressionCount === "number" && post.impressionCount >= setting.minimumImpressions);
-        const engagementCount = post.likeCount + post.repostCount + post.replyCount + post.quoteCount;
+        const engagementCount = post.likeCount + post.repostCount + post.replyCount + post.quoteCount + (post.bookmarkCount || 0);
+        const passesBookmarks = setting.minimumBookmarks <= 0 || (post.bookmarkCount || 0) >= setting.minimumBookmarks;
         return (
           passesImpressions &&
+          passesBookmarks &&
           engagementCount >= setting.minimumEngagements &&
           post.likeCount >= setting.minimumLikes &&
           post.repostCount >= setting.minimumReposts
@@ -78,6 +81,7 @@ export async function POST(request: Request) {
         relaxed: false,
         minimumImpressions: setting.minimumImpressions,
         minimumEngagements: setting.minimumEngagements,
+        minimumBookmarks: setting.minimumBookmarks,
         minimumLikes: setting.minimumLikes,
         minimumReposts: setting.minimumReposts
       }
