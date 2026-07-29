@@ -280,10 +280,21 @@ export function createXProvider(): XPostProvider {
 function buildXSearchQuery(setting: XSearchSetting) {
   const keywords = splitLinesAndCommas(setting.keywords);
   const hashtags = splitLinesAndCommas(setting.hashtags).map((tag) => (tag.startsWith("#") ? tag : `#${tag}`));
-  const accounts = splitLinesAndCommas(setting.targetAccounts).map((account) =>
-    `from:${account.replace(/^https?:\/\/(x|twitter)\.com\//, "").replace(/^@/, "").trim()}`
-  );
+  const accounts = splitLinesAndCommas(setting.targetAccounts).map(normalizeXAccount).filter(Boolean).slice(0, 20).map((account) => `from:${account}`);
   const excluded = splitLinesAndCommas(setting.excludedKeywords).map((keyword) => `-"${keyword}"`);
+
+  if (setting.searchMode === "benchmark" && accounts.length) {
+    return [
+      `(${accounts.join(" OR ")})`,
+      setting.language ? `lang:${setting.language}` : "",
+      "-is:retweet",
+      ...excluded
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .slice(0, 512);
+  }
+
   const positiveGroups = [...keywords, ...hashtags, ...accounts].filter(Boolean);
   const query = [
     positiveGroups.length ? `(${positiveGroups.join(" OR ")})` : "(AI OR ChatGPT OR SNS運用)",
@@ -302,4 +313,12 @@ function splitLinesAndCommas(value: string) {
     .split(/[\n,、]/)
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function normalizeXAccount(account: string) {
+  return account
+    .replace(/^https?:\/\/(www\.)?(x|twitter)\.com\//, "")
+    .replace(/^@/, "")
+    .split(/[/?#]/)[0]
+    .trim();
 }

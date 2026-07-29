@@ -95,6 +95,7 @@ const xAnalysesStorageKey = "sns-jidouka-x-analyses";
 const defaultXSearchSetting: XSearchSetting = {
   id: "default-ai",
   name: "AI・副業・SNS運用",
+  searchMode: "benchmark",
   keywords: "ChatGPT\nClaude\nAI副業\nSNS運用\n看護師副業",
   hashtags: "",
   targetAccounts: "",
@@ -331,6 +332,7 @@ export default function Home() {
           const normalized = parsed.map((setting) => ({
             ...defaultXSearchSetting,
             ...setting,
+            searchMode: setting.searchMode ?? defaultXSearchSetting.searchMode,
             minimumImpressions: setting.minimumImpressions ?? defaultXSearchSetting.minimumImpressions,
             minimumEngagements: setting.minimumEngagements ?? defaultXSearchSetting.minimumEngagements,
             minimumBookmarks: setting.minimumBookmarks ?? defaultXSearchSetting.minimumBookmarks,
@@ -591,15 +593,16 @@ export default function Home() {
     }
   }
 
-  async function fetchXTrendingPosts() {
+  async function fetchXTrendingPosts(searchMode: XSearchSetting["searchMode"] = activeXSearchSetting.searchMode) {
     setXBuzzLoading(true);
     setXBuzzError("");
+    const setting = { ...activeXSearchSetting, searchMode };
 
     try {
       const response = await fetch("/api/x-buzz/fetch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ setting: activeXSearchSetting })
+        body: JSON.stringify({ setting })
       });
       const data = (await response.json()) as {
         posts?: XTrendingPost[];
@@ -1609,8 +1612,31 @@ export default function Home() {
           <div className="mt-4 grid gap-4 xl:grid-cols-[360px_1fr]">
             <aside className="rounded-lg border border-slate-200 p-3">
               <div>
-                <h3 className="font-bold">かんたん収集設定</h3>
-                <p className="mt-1 text-xs text-slate-500">普段はここだけでOKです。細かい条件は下に隠しています。</p>
+                <h3 className="font-bold">ベンチマーク収集</h3>
+                <p className="mt-1 text-xs text-slate-500">参考アカウントを最大20件貼って、伸びている投稿だけ拾います。</p>
+              </div>
+              <TextArea
+                label="ベンチマークアカウント 最大20件"
+                value={activeXSearchSetting.targetAccounts}
+                onChange={(value) => updateActiveXSearchSetting("targetAccounts", value)}
+                rows={7}
+                help="@IDまたはURLを1行に1つ。ここから上位投稿を抜き出します。"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  updateActiveXSearchSetting("searchMode", "benchmark");
+                  void fetchXTrendingPosts("benchmark");
+                }}
+                disabled={xBuzzLoading || !activeXSearchSetting.isActive || !activeXSearchSetting.targetAccounts.trim()}
+                className="mt-3 w-full rounded-md bg-pink-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-45"
+              >
+                {xBuzzLoading ? "集めています..." : "ベンチマークからバズ投稿を集める"}
+              </button>
+              <div className="my-4 border-t border-slate-200" />
+              <div>
+                <h3 className="font-bold">キーワードでも探す</h3>
+                <p className="mt-1 text-xs text-slate-500">補助用です。普段はベンチマーク収集がおすすめです。</p>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 {[
@@ -1624,6 +1650,7 @@ export default function Home() {
                     type="button"
                     onClick={() => {
                       updateActiveXSearchSetting("name", preset.name);
+                      updateActiveXSearchSetting("searchMode", "keyword");
                       updateActiveXSearchSetting("keywords", preset.keywords);
                       updateActiveXSearchSetting("minimumImpressions", 0);
                       updateActiveXSearchSetting("minimumEngagements", preset.minimumEngagements);
@@ -1662,11 +1689,14 @@ export default function Home() {
               <div className="mt-3 grid gap-2">
                 <button
                   type="button"
-                  onClick={fetchXTrendingPosts}
+                  onClick={() => {
+                    updateActiveXSearchSetting("searchMode", "keyword");
+                    void fetchXTrendingPosts("keyword");
+                  }}
                   disabled={xBuzzLoading || !activeXSearchSetting.isActive}
                   className="rounded-md bg-pink-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-45"
                 >
-                  {xBuzzLoading ? "集めています..." : "この条件でバズ投稿を集める"}
+                  {xBuzzLoading ? "集めています..." : "キーワードでバズ投稿を集める"}
                 </button>
                 <button
                   type="button"
@@ -1722,13 +1752,6 @@ export default function Home() {
                   value={activeXSearchSetting.hashtags}
                   onChange={(value) => updateActiveXSearchSetting("hashtags", value)}
                   rows={3}
-                />
-                <TextArea
-                  label="参考にするXアカウント"
-                  value={activeXSearchSetting.targetAccounts}
-                  onChange={(value) => updateActiveXSearchSetting("targetAccounts", value)}
-                  rows={3}
-                  help="@IDやURLを1行に1つ。公式API利用時に検索条件へ反映します。"
                 />
                 <TextArea
                   label="除外キーワード"

@@ -1,6 +1,7 @@
 export type XSearchSetting = {
   id: string;
   name: string;
+  searchMode: "keyword" | "benchmark";
   keywords: string;
   hashtags: string;
   targetAccounts: string;

@@ -20,6 +20,7 @@ function validateSetting(value: unknown): XSearchSetting | null {
   return {
     id: pickString(data.id) || `setting-${Date.now()}`,
     name: pickString(data.name) || "未命名の検索条件",
+    searchMode: pickString(data.searchMode) === "benchmark" ? "benchmark" : "keyword",
     keywords: pickString(data.keywords),
     hashtags: pickString(data.hashtags),
     targetAccounts: pickString(data.targetAccounts),
