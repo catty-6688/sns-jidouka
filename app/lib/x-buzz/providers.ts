@@ -187,6 +187,7 @@ export class XApiProvider implements XPostProvider {
     const candidateLimit = Math.min(Math.max(setting.fetchLimit * 3, 30), 100);
     url.searchParams.set("query", query);
     url.searchParams.set("max_results", String(candidateLimit));
+    url.searchParams.set("sort_order", "relevancy");
     url.searchParams.set("start_time", startTime.toISOString());
     url.searchParams.set("tweet.fields", "created_at,public_metrics,attachments,author_id");
     url.searchParams.set("expansions", "author_id");

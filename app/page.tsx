@@ -1798,7 +1798,7 @@ export default function Home() {
                 <div className="mt-3 rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
                   <p className="font-bold">0件になる主な理由</p>
                   <p className="mt-1">
-                    X APIはバズ順ではなく最近の投稿から取得します。その後に「最低表示数」で絞るため、10,000以上など条件が強いと0件になることがあります。
+                    X APIから最大100件の候補を取得し、その後に「最低表示数」で絞ります。1万表示以上が出ない時は、キーワードを具体化するか、ベンチマークのXアカウントを詳細設定に入れてください。
                   </p>
                 </div>
                 <details className="mt-3 text-sm">

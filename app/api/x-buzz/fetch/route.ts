@@ -54,23 +54,21 @@ export async function POST(request: Request) {
         return passesImpressions && post.likeCount >= setting.minimumLikes && post.repostCount >= setting.minimumReposts;
       })
       .slice(0, setting.fetchLimit);
-    const relaxed = strictPosts.length === 0 && candidates.length > 0;
-    const posts = relaxed ? candidates.slice(0, setting.fetchLimit) : strictPosts;
 
-    const message = relaxed
-      ? `Xから${candidates.length}件見つかりましたが、最低表示数${setting.minimumImpressions.toLocaleString("ja-JP")}以上では0件でした。条件をゆるめた候補を表示します。`
-      : posts.length
-        ? `${posts.length}件の投稿候補を取得しました。`
-        : `Xから候補が見つかりませんでした。キーワードを減らすか、取得件数を増やしてください。`;
+    const message = strictPosts.length
+      ? `${strictPosts.length}件のバズ投稿候補を取得しました。`
+      : candidates.length
+        ? `Xから${candidates.length}件見つかりましたが、最低表示数${setting.minimumImpressions.toLocaleString("ja-JP")}以上の投稿はありませんでした。キーワードを具体化するか、対象アカウントを入れて探してください。`
+        : `Xから候補が見つかりませんでした。キーワードを減らすか、対象アカウントを入れてください。`;
 
     return NextResponse.json({
-      posts,
+      posts: strictPosts,
       source: getXProviderStatus().mode,
       message,
       diagnostics: {
         candidateCount: candidates.length,
         strictCount: strictPosts.length,
-        relaxed,
+        relaxed: false,
         minimumImpressions: setting.minimumImpressions,
         minimumLikes: setting.minimumLikes,
         minimumReposts: setting.minimumReposts
