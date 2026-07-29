@@ -7,6 +7,7 @@ export type XSearchSetting = {
   excludedKeywords: string;
   language: string;
   periodDays: number;
+  minimumImpressions: number;
   minimumLikes: number;
   minimumReposts: number;
   fetchLimit: number;

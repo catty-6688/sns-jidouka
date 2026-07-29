@@ -13,7 +13,7 @@ type Template = "basic" | "education" | "story";
 type Mode = "single" | "weekly";
 type AgentId = "research" | "buzz" | "account" | "planning" | "writing";
 type View = "dashboard" | "profile" | "instant" | "analysis" | "buzz" | "calendar" | "history";
-type XSortKey = "buzzScore" | "likeCount" | "repostCount" | "engagementRate" | "postedAt";
+type XSortKey = "buzzScore" | "impressionCount" | "likeCount" | "repostCount" | "engagementRate" | "postedAt";
 type XConnectionStatus = {
   provider: string;
   mode: "api" | "mock";
@@ -101,9 +101,10 @@ const defaultXSearchSetting: XSearchSetting = {
   excludedKeywords: "簡単に稼げる\n誰でも月収\n確実に稼げる",
   language: "ja",
   periodDays: 7,
-  minimumLikes: 500,
+  minimumImpressions: 10000,
+  minimumLikes: 0,
   minimumReposts: 0,
-  fetchLimit: 10,
+  fetchLimit: 15,
   brand: "キャティ",
   isActive: true
 };
@@ -325,8 +326,14 @@ export default function Home() {
       try {
         const parsed = JSON.parse(savedXSearchSettings) as XSearchSetting[];
         if (parsed.length) {
-          setXSearchSettings(parsed);
-          setActiveXSearchId(parsed[0].id);
+          const normalized = parsed.map((setting) => ({
+            ...defaultXSearchSetting,
+            ...setting,
+            minimumImpressions: setting.minimumImpressions ?? defaultXSearchSetting.minimumImpressions,
+            minimumLikes: setting.minimumLikes ?? defaultXSearchSetting.minimumLikes
+          }));
+          setXSearchSettings(normalized);
+          setActiveXSearchId(normalized[0].id);
         }
       } catch {
         window.localStorage.removeItem(xSearchSettingsStorageKey);
@@ -1603,10 +1610,10 @@ export default function Home() {
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 {[
-                  { name: "AI投稿", keywords: "ChatGPT\nClaude\nAI活用\nSNS運用", minimumLikes: 500, fetchLimit: 15 },
-                  { name: "副業", keywords: "AI副業\n副業\n在宅ワーク\nSNS集客", minimumLikes: 500, fetchLimit: 15 },
-                  { name: "看護師副業", keywords: "看護師副業\n看護師 在宅\nナース副業", minimumLikes: 200, fetchLimit: 10 },
-                  { name: "美容×AI", keywords: "美容 AI\n美容 SNS\n美容集客", minimumLikes: 200, fetchLimit: 10 }
+                  { name: "AI投稿", keywords: "ChatGPT\nClaude\nAI活用\nSNS運用", minimumImpressions: 10000, minimumLikes: 0, fetchLimit: 15 },
+                  { name: "副業", keywords: "AI副業\n副業\n在宅ワーク\nSNS集客", minimumImpressions: 10000, minimumLikes: 0, fetchLimit: 15 },
+                  { name: "看護師副業", keywords: "看護師副業\n看護師 在宅\nナース副業", minimumImpressions: 10000, minimumLikes: 0, fetchLimit: 15 },
+                  { name: "美容×AI", keywords: "美容 AI\n美容 SNS\n美容集客", minimumImpressions: 10000, minimumLikes: 0, fetchLimit: 15 }
                 ].map((preset) => (
                   <button
                     key={preset.name}
@@ -1614,6 +1621,7 @@ export default function Home() {
                     onClick={() => {
                       updateActiveXSearchSetting("name", preset.name);
                       updateActiveXSearchSetting("keywords", preset.keywords);
+                      updateActiveXSearchSetting("minimumImpressions", preset.minimumImpressions);
                       updateActiveXSearchSetting("minimumLikes", preset.minimumLikes);
                       updateActiveXSearchSetting("fetchLimit", preset.fetchLimit);
                     }}
@@ -1636,9 +1644,9 @@ export default function Home() {
               />
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <NumberInput
-                  label="最低いいね"
-                  value={activeXSearchSetting.minimumLikes}
-                  onChange={(value) => updateActiveXSearchSetting("minimumLikes", value)}
+                  label="最低表示数"
+                  value={activeXSearchSetting.minimumImpressions ?? defaultXSearchSetting.minimumImpressions}
+                  onChange={(value) => updateActiveXSearchSetting("minimumImpressions", value)}
                 />
                 <NumberInput
                   label="取得件数"
@@ -1658,6 +1666,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => {
+                    updateActiveXSearchSetting("minimumImpressions", 0);
                     updateActiveXSearchSetting("minimumLikes", 0);
                     updateActiveXSearchSetting("minimumReposts", 0);
                     updateActiveXSearchSetting("fetchLimit", 30);
@@ -1732,6 +1741,11 @@ export default function Home() {
                     onChange={(value) => updateActiveXSearchSetting("periodDays", value)}
                   />
                   <NumberInput
+                    label="最低いいね（補助）"
+                    value={activeXSearchSetting.minimumLikes}
+                    onChange={(value) => updateActiveXSearchSetting("minimumLikes", value)}
+                  />
+                  <NumberInput
                     label="最低リポスト"
                     value={activeXSearchSetting.minimumReposts}
                     onChange={(value) => updateActiveXSearchSetting("minimumReposts", value)}
@@ -1764,6 +1778,7 @@ export default function Home() {
                       className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
                     >
                       <option value="buzzScore">バズ度</option>
+                      <option value="impressionCount">表示数</option>
                       <option value="likeCount">いいね数</option>
                       <option value="repostCount">リポスト数</option>
                       <option value="engagementRate">反応率</option>
@@ -2013,6 +2028,7 @@ function XTrendingPostCard({
   onSendDraft: (draft: ThreadsDraftIdea) => void;
 }) {
   const engagementLabel = post.engagementRate === undefined ? "不明" : `${post.engagementRate}%`;
+  const impressionLabel = typeof post.impressionCount === "number" ? post.impressionCount.toLocaleString("ja-JP") : "不明";
   const riskLabel = analysisResult?.analysis.riskLevel || "未分析";
 
   return (
@@ -2021,6 +2037,7 @@ function XTrendingPostCard({
         <div className="min-w-0">
           <div className="flex flex-wrap gap-2 text-xs font-bold">
             <span className="rounded-full bg-pink-100 px-2 py-1 text-pink-700">バズ度 {post.buzzScore}</span>
+            <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">表示 {impressionLabel}</span>
             <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">いいね {post.likeCount}</span>
             <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">リポスト {post.repostCount}</span>
             <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">反応率 {engagementLabel}</span>

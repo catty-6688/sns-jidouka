@@ -184,8 +184,9 @@ export class XApiProvider implements XPostProvider {
     const query = buildXSearchQuery(setting);
     const url = new URL("https://api.x.com/2/tweets/search/recent");
     const startTime = new Date(Date.now() - Math.min(Math.max(setting.periodDays, 1), 7) * 24 * 60 * 60 * 1000);
+    const candidateLimit = Math.min(Math.max(setting.fetchLimit * 3, 30), 100);
     url.searchParams.set("query", query);
-    url.searchParams.set("max_results", String(Math.min(Math.max(setting.fetchLimit, 10), 100)));
+    url.searchParams.set("max_results", String(candidateLimit));
     url.searchParams.set("start_time", startTime.toISOString());
     url.searchParams.set("tweet.fields", "created_at,public_metrics,attachments,author_id");
     url.searchParams.set("expansions", "author_id");
@@ -253,7 +254,7 @@ export class XApiProvider implements XPostProvider {
         };
       })
       .sort((a, b) => b.buzzScore - a.buzzScore)
-      .slice(0, Math.min(Math.max(setting.fetchLimit, 10), 100));
+      .slice(0, candidateLimit);
   }
 }
 

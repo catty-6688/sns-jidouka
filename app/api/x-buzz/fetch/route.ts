@@ -26,7 +26,8 @@ function validateSetting(value: unknown): XSearchSetting | null {
     excludedKeywords: pickString(data.excludedKeywords),
     language: pickString(data.language) || "ja",
     periodDays: pickNumber(data.periodDays, 7),
-    minimumLikes: pickNumber(data.minimumLikes, 500),
+    minimumImpressions: pickNumber(data.minimumImpressions, 10000),
+    minimumLikes: pickNumber(data.minimumLikes, 0),
     minimumReposts: pickNumber(data.minimumReposts, 0),
     fetchLimit: Math.min(Math.max(pickNumber(data.fetchLimit, 10), 1), 50),
     brand: pickString(data.brand) || "default",
@@ -46,13 +47,18 @@ export async function POST(request: Request) {
     const provider = createXProvider();
     const candidates = await provider.fetchTrendingPosts({ setting });
     const strictPosts = candidates
-      .filter((post) => post.likeCount >= setting.minimumLikes && post.repostCount >= setting.minimumReposts)
+      .filter((post) => {
+        const passesImpressions =
+          setting.minimumImpressions <= 0 ||
+          (typeof post.impressionCount === "number" && post.impressionCount >= setting.minimumImpressions);
+        return passesImpressions && post.likeCount >= setting.minimumLikes && post.repostCount >= setting.minimumReposts;
+      })
       .slice(0, setting.fetchLimit);
     const relaxed = strictPosts.length === 0 && candidates.length > 0;
     const posts = relaxed ? candidates.slice(0, setting.fetchLimit) : strictPosts;
 
     const message = relaxed
-      ? `Xから${candidates.length}件見つかりましたが、最低いいね${setting.minimumLikes}以上では0件でした。条件をゆるめた候補を表示します。`
+      ? `Xから${candidates.length}件見つかりましたが、最低表示数${setting.minimumImpressions.toLocaleString("ja-JP")}以上では0件でした。条件をゆるめた候補を表示します。`
       : posts.length
         ? `${posts.length}件の投稿候補を取得しました。`
         : `Xから候補が見つかりませんでした。キーワードを減らすか、取得件数を増やしてください。`;
@@ -65,6 +71,7 @@ export async function POST(request: Request) {
         candidateCount: candidates.length,
         strictCount: strictPosts.length,
         relaxed,
+        minimumImpressions: setting.minimumImpressions,
         minimumLikes: setting.minimumLikes,
         minimumReposts: setting.minimumReposts
       }
