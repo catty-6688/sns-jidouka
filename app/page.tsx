@@ -1,12 +1,26 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import type {
+  ThreadsDraftIdea,
+  XBuzzAnalyzeResult,
+  XSearchSetting,
+  XTrendingPost
+} from "@/app/lib/x-buzz/types";
 
 type Tone = "やさしい" | "煽り系" | "共感系" | "プロっぽい";
 type Template = "basic" | "education" | "story";
 type Mode = "single" | "weekly";
 type AgentId = "research" | "buzz" | "account" | "planning" | "writing";
-type View = "dashboard" | "profile" | "instant" | "analysis" | "calendar" | "history";
+type View = "dashboard" | "profile" | "instant" | "analysis" | "buzz" | "calendar" | "history";
+type XSortKey = "buzzScore" | "likeCount" | "repostCount" | "engagementRate" | "postedAt";
+type XConnectionStatus = {
+  provider: string;
+  mode: "api" | "mock";
+  hasBearerToken: boolean;
+  isApiReady: boolean;
+  message: string;
+};
 
 type GeneratedPost = {
   title: string;
@@ -74,6 +88,25 @@ const threadsAuthStorageKey = "sns-jidouka-threads-auth";
 const threadsPostStorageKey = "sns-jidouka-threads-posts";
 const scheduleStorageKey = "sns-jidouka-schedule";
 const scheduledPostStorageKey = "sns-jidouka-scheduled-posts";
+const xSearchSettingsStorageKey = "sns-jidouka-x-search-settings";
+const xTrendingPostsStorageKey = "sns-jidouka-x-trending-posts";
+const xAnalysesStorageKey = "sns-jidouka-x-analyses";
+
+const defaultXSearchSetting: XSearchSetting = {
+  id: "default-ai",
+  name: "AI・副業・SNS運用",
+  keywords: "ChatGPT\nClaude\nAI副業\nSNS運用\n看護師副業",
+  hashtags: "",
+  targetAccounts: "",
+  excludedKeywords: "簡単に稼げる\n誰でも月収\n確実に稼げる",
+  language: "ja",
+  periodDays: 7,
+  minimumLikes: 500,
+  minimumReposts: 0,
+  fetchLimit: 10,
+  brand: "キャティ",
+  isActive: true
+};
 
 const defaultProfile = {
   genre: "AI × 美容 × 副業/SNS集客",
@@ -144,6 +177,18 @@ export default function Home() {
   const [scheduleStartDate, setScheduleStartDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [postTimes, setPostTimes] = useState(["08:00", "12:30", "20:00", ""]);
   const [bookingUrl, setBookingUrl] = useState("");
+  const [xSearchSettings, setXSearchSettings] = useState<XSearchSetting[]>([defaultXSearchSetting]);
+  const [activeXSearchId, setActiveXSearchId] = useState(defaultXSearchSetting.id);
+  const [xTrendingPosts, setXTrendingPosts] = useState<XTrendingPost[]>([]);
+  const [xAnalyses, setXAnalyses] = useState<Record<string, XBuzzAnalyzeResult>>({});
+  const [xBuzzLoading, setXBuzzLoading] = useState(false);
+  const [xAnalyzingId, setXAnalyzingId] = useState("");
+  const [xBuzzError, setXBuzzError] = useState("");
+  const [xConnectionStatus, setXConnectionStatus] = useState<XConnectionStatus | null>(null);
+  const [xSortKey, setXSortKey] = useState<XSortKey>("buzzScore");
+  const [xMinimumBuzz, setXMinimumBuzz] = useState(0);
+  const [xOnlyFavorite, setXOnlyFavorite] = useState(false);
+  const [xHideHidden, setXHideHidden] = useState(true);
   const [result, setResult] = useState<GeneratedResult | null>(null);
   const [runningAgent, setRunningAgent] = useState<AgentId | "">("");
   const [loading, setLoading] = useState(false);
@@ -156,6 +201,20 @@ export default function Home() {
   const [copiedId, setCopiedId] = useState("");
 
   const isReady = useMemo(() => genre.trim() && target.trim() && pain.trim(), [genre, target, pain]);
+  const activeXSearchSetting = useMemo(
+    () => xSearchSettings.find((setting) => setting.id === activeXSearchId) || xSearchSettings[0] || defaultXSearchSetting,
+    [activeXSearchId, xSearchSettings]
+  );
+  const visibleXTrendingPosts = useMemo(() => {
+    return xTrendingPosts
+      .filter((post) => (xHideHidden ? !post.isHidden : true))
+      .filter((post) => (xOnlyFavorite ? post.isFavorite : true))
+      .filter((post) => post.buzzScore >= xMinimumBuzz)
+      .sort((a, b) => {
+        if (xSortKey === "postedAt") return new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime();
+        return (b[xSortKey] || 0) - (a[xSortKey] || 0);
+      });
+  }, [xHideHidden, xMinimumBuzz, xOnlyFavorite, xSortKey, xTrendingPosts]);
 
   useEffect(() => {
     if (!loading || !loadingStartedAt) {
@@ -260,6 +319,41 @@ export default function Home() {
         window.localStorage.removeItem(scheduleStorageKey);
       }
     }
+
+    const savedXSearchSettings = window.localStorage.getItem(xSearchSettingsStorageKey);
+    if (savedXSearchSettings) {
+      try {
+        const parsed = JSON.parse(savedXSearchSettings) as XSearchSetting[];
+        if (parsed.length) {
+          setXSearchSettings(parsed);
+          setActiveXSearchId(parsed[0].id);
+        }
+      } catch {
+        window.localStorage.removeItem(xSearchSettingsStorageKey);
+      }
+    }
+
+    const savedXTrendingPosts = window.localStorage.getItem(xTrendingPostsStorageKey);
+    if (savedXTrendingPosts) {
+      try {
+        setXTrendingPosts(JSON.parse(savedXTrendingPosts) as XTrendingPost[]);
+      } catch {
+        window.localStorage.removeItem(xTrendingPostsStorageKey);
+      }
+    }
+
+    const savedXAnalyses = window.localStorage.getItem(xAnalysesStorageKey);
+    if (savedXAnalyses) {
+      try {
+        setXAnalyses(JSON.parse(savedXAnalyses) as Record<string, XBuzzAnalyzeResult>);
+      } catch {
+        window.localStorage.removeItem(xAnalysesStorageKey);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshXConnectionStatus();
   }, []);
 
   function flash(message: string) {
@@ -442,6 +536,193 @@ export default function Home() {
 
   function updatePostTime(index: number, value: string) {
     setPostTimes((current) => current.map((time, timeIndex) => (timeIndex === index ? value : time)));
+  }
+
+  function saveXSearchSettings(settings = xSearchSettings) {
+    window.localStorage.setItem(xSearchSettingsStorageKey, JSON.stringify(settings));
+    markAction("x-search-save", "バズネタ検索条件を保存しました");
+  }
+
+  function updateActiveXSearchSetting<K extends keyof XSearchSetting>(key: K, value: XSearchSetting[K]) {
+    setXSearchSettings((current) => {
+      const next = current.map((setting) =>
+        setting.id === activeXSearchSetting.id ? { ...setting, [key]: value } : setting
+      );
+      window.localStorage.setItem(xSearchSettingsStorageKey, JSON.stringify(next));
+      return next;
+    });
+  }
+
+  function addXSearchSetting() {
+    const setting: XSearchSetting = {
+      ...defaultXSearchSetting,
+      id: `setting-${Date.now()}`,
+      name: `検索条件 ${xSearchSettings.length + 1}`,
+      keywords: "",
+      hashtags: "",
+      targetAccounts: "",
+      excludedKeywords: ""
+    };
+    const next = [...xSearchSettings, setting];
+    setXSearchSettings(next);
+    setActiveXSearchId(setting.id);
+    window.localStorage.setItem(xSearchSettingsStorageKey, JSON.stringify(next));
+    flash("検索条件を追加しました");
+  }
+
+  async function refreshXConnectionStatus() {
+    try {
+      const response = await fetch("/api/x-buzz/status", { cache: "no-store" });
+      const data = (await response.json()) as XConnectionStatus;
+      if (response.ok) setXConnectionStatus(data);
+    } catch {
+      setXConnectionStatus(null);
+    }
+  }
+
+  async function fetchXTrendingPosts() {
+    setXBuzzLoading(true);
+    setXBuzzError("");
+
+    try {
+      const response = await fetch("/api/x-buzz/fetch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ setting: activeXSearchSetting })
+      });
+      const data = (await response.json()) as { posts?: XTrendingPost[]; message?: string; source?: "api" | "mock" };
+      if (!response.ok || !data.posts) throw new Error(data.message || "X投稿を取得できませんでした。");
+
+      const merged = mergeXPosts(xTrendingPosts, data.posts);
+      setXTrendingPosts(merged);
+      window.localStorage.setItem(xTrendingPostsStorageKey, JSON.stringify(merged));
+      markAction("x-fetch", `${data.posts.length}件の投稿候補を取得しました（${data.source === "api" ? "X API" : "テストデータ"}）`);
+      void refreshXConnectionStatus();
+    } catch (caught) {
+      setXBuzzError(caught instanceof Error ? caught.message : "X投稿の取得に失敗しました。");
+    } finally {
+      setXBuzzLoading(false);
+    }
+  }
+
+  async function analyzeXTrendingPost(post: XTrendingPost) {
+    setXAnalyzingId(post.id);
+    setXBuzzError("");
+
+    try {
+      const response = await fetch("/api/x-buzz/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          post,
+          profile: {
+            genre,
+            target,
+            tone,
+            character,
+            offer,
+            personalExperiences,
+            recentOwnPosts
+          }
+        })
+      });
+      const data = (await response.json()) as XBuzzAnalyzeResult & { message?: string };
+      if (!response.ok || !data.analysis || !data.drafts) {
+        throw new Error(data.message || "AI分析に失敗しました。");
+      }
+
+      const nextAnalyses = { ...xAnalyses, [post.id]: { analysis: data.analysis, drafts: data.drafts } };
+      setXAnalyses(nextAnalyses);
+      window.localStorage.setItem(xAnalysesStorageKey, JSON.stringify(nextAnalyses));
+      updateXPost(post.id, { status: "投稿案作成済み" });
+      markAction(`x-analyze-${post.id}`, "AI分析とThreads案を作成しました");
+    } catch (caught) {
+      setXBuzzError(caught instanceof Error ? caught.message : "AI分析に失敗しました。");
+    } finally {
+      setXAnalyzingId("");
+    }
+  }
+
+  function updateXPost(id: string, patch: Partial<XTrendingPost>) {
+    setXTrendingPosts((current) => {
+      const next = current.map((post) => (post.id === id ? { ...post, ...patch } : post));
+      window.localStorage.setItem(xTrendingPostsStorageKey, JSON.stringify(next));
+      return next;
+    });
+  }
+
+  function updateXDraft(postId: string, draftIndex: number, patch: Partial<ThreadsDraftIdea>) {
+    setXAnalyses((current) => {
+      const currentAnalysis = current[postId];
+      if (!currentAnalysis) return current;
+
+      const next = {
+        ...current,
+        [postId]: {
+          ...currentAnalysis,
+          drafts: currentAnalysis.drafts.map((draft, index) =>
+            index === draftIndex ? { ...draft, ...patch } : draft
+          )
+        }
+      };
+      window.localStorage.setItem(xAnalysesStorageKey, JSON.stringify(next));
+      return next;
+    });
+  }
+
+  function sendBuzzDraftToCalendar(post: XTrendingPost, draft: ThreadsDraftIdea) {
+    if (draft.similarityRisk === "high" || draft.similarityScore >= 65) {
+      const ok = window.confirm(
+        "元投稿との表現が近すぎる可能性があります。独自の体験や意見を追加してから送りますか？"
+      );
+      if (!ok) return;
+    }
+
+    const body = [draft.opening, draft.body, draft.closing]
+      .filter(Boolean)
+      .join("\n\n");
+
+    setResult({
+      threads: [{ title: `${draft.type}: ${post.authorUsername}`, body }],
+      x: [],
+      checkpoints: [
+        {
+          title: "元投稿の確認",
+          whatToCheck: `元ネタURL: ${post.postUrl}`,
+          decision: "表現を写していないか確認する"
+        },
+        {
+          title: "ファクトチェック",
+          whatToCheck: draft.needsFactCheck ? "事実確認が必要です" : "事実確認リスクは低めです",
+          decision: "必要なら公式情報を確認してから予約する"
+        }
+      ],
+      weekly: [
+        {
+          day: "バズネタ",
+          theme: "Xバズ投稿からThreads案",
+          intent: "元投稿の型だけを参考にして自分の言葉で投稿する",
+          posts: [
+            {
+              title: `${draft.type}案`,
+              body,
+              cta: draft.cta,
+              experienceUsed: draft.originalInfoNeeded || "独自体験を必要に応じて追加",
+              referencePattern: `元ネタ: ${post.postUrl}`,
+              score: {
+                novelty: "元投稿の話題を、自アカウント向けに切り替え",
+                personality: "体験や意見を追加して調整",
+                expertise: "AI活用/SNS運用の視点で補強",
+                curiosity: draft.opening
+              }
+            }
+          ]
+        }
+      ]
+    });
+    updateXPost(post.id, { status: "下書き保存済み" });
+    setView("calendar");
+    flash("既存の投稿カレンダーへ下書きを送りました");
   }
 
   function updateWeeklyPostTitle(dayIndex: number, postIndex: number, title: string) {
@@ -801,6 +1082,7 @@ export default function Home() {
     { id: "profile", label: "素材設定", shortLabel: "素材" },
     { id: "instant", label: "今すぐ投稿", shortLabel: "今すぐ" },
     { id: "analysis", label: "AI分析", shortLabel: "分析" },
+    { id: "buzz", label: "バズネタ収集", shortLabel: "バズ" },
     { id: "calendar", label: "投稿カレンダー", shortLabel: "予約" },
     { id: "history", label: "履歴", shortLabel: "履歴" }
   ];
@@ -813,7 +1095,7 @@ export default function Home() {
         <p className="mt-2 text-sm text-slate-600">月4回だけ確認。1回で7日分を作り、修正したら予約・投稿するだけにします。</p>
       </header>
 
-      <nav className="mb-6 hidden gap-2 sm:grid sm:grid-cols-6">
+      <nav className="mb-6 hidden gap-2 sm:grid sm:grid-cols-7">
         {navItems.map((item) => (
           <NavButton key={item.id} active={view === item.id} onClick={() => setView(item.id)}>
             {item.label}
@@ -822,7 +1104,7 @@ export default function Home() {
       </nav>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-[#0a000c]/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] pt-2 backdrop-blur sm:hidden">
-        <div className="grid grid-cols-6 gap-1">
+        <div className="grid grid-cols-7 gap-1">
           {navItems.map((item) => (
             <MobileNavButton key={item.id} active={view === item.id} onClick={() => setView(item.id)}>
               {item.shortLabel}
@@ -840,7 +1122,7 @@ export default function Home() {
       {view === "dashboard" ? (
         <section className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
           <h2 className="text-xl font-bold">今日やること</h2>
-          <div className="mt-4 grid gap-3 md:grid-cols-4">
+          <div className="mt-4 grid gap-3 md:grid-cols-5">
             <button type="button" onClick={() => setView("profile")} className="rounded-md border border-slate-200 p-4 text-left hover:bg-slate-50">
               <p className="font-bold">1. 素材を確認</p>
               <p className="mt-1 text-sm text-slate-600">プロフィール、経歴、ベンチマークを入れる</p>
@@ -849,12 +1131,16 @@ export default function Home() {
               <p className="font-bold">2. AI社員に分析</p>
               <p className="mt-1 text-sm text-slate-600">リサーチ、バズ分析、企画を作る</p>
             </button>
+            <button type="button" onClick={() => setView("buzz")} className="rounded-md border border-slate-200 p-4 text-left hover:bg-slate-50">
+              <p className="font-bold">3. バズネタ収集</p>
+              <p className="mt-1 text-sm text-slate-600">Xの伸び投稿からThreads案を作る</p>
+            </button>
             <button type="button" onClick={() => setView("calendar")} className="rounded-md border border-slate-200 p-4 text-left hover:bg-slate-50">
-              <p className="font-bold">3. 投稿生成と予約</p>
+              <p className="font-bold">4. 投稿生成と予約</p>
               <p className="mt-1 text-sm text-slate-600">7日分を月間カレンダーで確認</p>
             </button>
             <button type="button" onClick={() => setView("history")} className="rounded-md border border-slate-200 p-4 text-left hover:bg-slate-50">
-              <p className="font-bold">4. 履歴を見る</p>
+              <p className="font-bold">5. 履歴を見る</p>
               <p className="mt-1 text-sm text-slate-600">過去の生成結果を読み込む</p>
             </button>
           </div>
@@ -1244,6 +1530,280 @@ export default function Home() {
       </section>
       ) : null}
 
+      {view === "buzz" ? (
+        <section className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-xl font-bold">バズネタ収集</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Xのバズ投稿から、言葉ではなく「話題・切り口・構成」だけを参考にしてThreads案を作ります。
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => saveXSearchSettings()}
+                className={`rounded-md border border-slate-300 px-4 py-2 text-sm font-bold transition active:scale-[0.98] ${
+                  actionFeedback === "x-search-save" ? "bg-green-500 text-white" : ""
+                }`}
+              >
+                {actionFeedback === "x-search-save" ? "保存済み" : "条件を保存"}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-md border border-pink-200 bg-pink-50 p-3 text-sm text-pink-700">
+            <p className="font-bold">安全ルール</p>
+            <p className="mt-1">
+              元投稿の文章はコピーしません。AI案は必ず編集・確認してから、既存の投稿カレンダーへ送ります。
+            </p>
+          </div>
+
+          <div
+            className={`mt-3 rounded-md border p-3 text-sm ${
+              xConnectionStatus?.isApiReady
+                ? "border-green-200 bg-green-50 text-green-800"
+                : "border-yellow-200 bg-yellow-50 text-yellow-800"
+            }`}
+          >
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-bold">
+                  X接続状態: {xConnectionStatus?.isApiReady ? "本接続OK" : "まだテスト取得"}
+                </p>
+                <p className="mt-1">
+                  {xConnectionStatus?.message || "接続状態を確認しています。"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={refreshXConnectionStatus}
+                className="rounded-md border border-current px-3 py-2 text-xs font-bold"
+              >
+                状態を再確認
+              </button>
+            </div>
+          </div>
+
+          {xBuzzError ? <p className="mt-3 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">{xBuzzError}</p> : null}
+
+          <div className="mt-4 grid gap-4 xl:grid-cols-[360px_1fr]">
+            <aside className="rounded-lg border border-slate-200 p-3">
+              <div>
+                <h3 className="font-bold">かんたん収集設定</h3>
+                <p className="mt-1 text-xs text-slate-500">普段はここだけでOKです。細かい条件は下に隠しています。</p>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {[
+                  { name: "AI投稿", keywords: "ChatGPT\nClaude\nAI活用\nSNS運用", minimumLikes: 500, fetchLimit: 15 },
+                  { name: "副業", keywords: "AI副業\n副業\n在宅ワーク\nSNS集客", minimumLikes: 500, fetchLimit: 15 },
+                  { name: "看護師副業", keywords: "看護師副業\n看護師 在宅\nナース副業", minimumLikes: 200, fetchLimit: 10 },
+                  { name: "美容×AI", keywords: "美容 AI\n美容 SNS\n美容集客", minimumLikes: 200, fetchLimit: 10 }
+                ].map((preset) => (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    onClick={() => {
+                      updateActiveXSearchSetting("name", preset.name);
+                      updateActiveXSearchSetting("keywords", preset.keywords);
+                      updateActiveXSearchSetting("minimumLikes", preset.minimumLikes);
+                      updateActiveXSearchSetting("fetchLimit", preset.fetchLimit);
+                    }}
+                    className={`rounded-md border px-3 py-2 text-sm font-bold ${
+                      activeXSearchSetting.name === preset.name
+                        ? "border-pink-600 bg-pink-50 text-pink-700"
+                        : "border-slate-300"
+                    }`}
+                  >
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
+              <TextArea
+                label="探したいテーマ・キーワード"
+                value={activeXSearchSetting.keywords}
+                onChange={(value) => updateActiveXSearchSetting("keywords", value)}
+                rows={4}
+                help="迷ったらプリセットを押してください。1行に1つだけ入れます。"
+              />
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <NumberInput
+                  label="最低いいね"
+                  value={activeXSearchSetting.minimumLikes}
+                  onChange={(value) => updateActiveXSearchSetting("minimumLikes", value)}
+                />
+                <NumberInput
+                  label="取得件数"
+                  value={activeXSearchSetting.fetchLimit}
+                  onChange={(value) => updateActiveXSearchSetting("fetchLimit", value)}
+                />
+              </div>
+              <div className="mt-3 grid gap-2">
+                <button
+                  type="button"
+                  onClick={fetchXTrendingPosts}
+                  disabled={xBuzzLoading || !activeXSearchSetting.isActive}
+                  className="rounded-md bg-pink-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-45"
+                >
+                  {xBuzzLoading ? "集めています..." : "この条件でバズ投稿を集める"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => saveXSearchSettings()}
+                  className={`rounded-md border border-slate-300 px-4 py-2 text-sm font-bold transition active:scale-[0.98] ${
+                    actionFeedback === "x-search-save" ? "bg-green-500 text-white" : ""
+                  }`}
+                >
+                  {actionFeedback === "x-search-save" ? "保存済み" : "今の条件を保存"}
+                </button>
+              </div>
+              <details className="mt-4 rounded-md border border-slate-200 p-3 text-sm">
+                <summary className="cursor-pointer font-bold">詳細設定を開く</summary>
+                <label className="mt-3 block text-sm font-bold">
+                  保存済み条件
+                  <select
+                    value={activeXSearchId}
+                    onChange={(event) => setActiveXSearchId(event.target.value)}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                  >
+                    {xSearchSettings.map((setting) => (
+                      <option key={setting.id} value={setting.id}>
+                        {setting.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button type="button" onClick={addXSearchSetting} className="mt-2 rounded-md border border-slate-300 px-3 py-2 text-xs font-bold">
+                  条件を追加
+                </button>
+                <Input
+                  label="条件名"
+                  value={activeXSearchSetting.name}
+                  onChange={(value) => updateActiveXSearchSetting("name", value)}
+                />
+                <TextArea
+                  label="ハッシュタグ"
+                  value={activeXSearchSetting.hashtags}
+                  onChange={(value) => updateActiveXSearchSetting("hashtags", value)}
+                  rows={3}
+                />
+                <TextArea
+                  label="参考にするXアカウント"
+                  value={activeXSearchSetting.targetAccounts}
+                  onChange={(value) => updateActiveXSearchSetting("targetAccounts", value)}
+                  rows={3}
+                  help="@IDやURLを1行に1つ。公式API利用時に検索条件へ反映します。"
+                />
+                <TextArea
+                  label="除外キーワード"
+                  value={activeXSearchSetting.excludedKeywords}
+                  onChange={(value) => updateActiveXSearchSetting("excludedKeywords", value)}
+                  rows={3}
+                />
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <Input
+                    label="対象言語"
+                    value={activeXSearchSetting.language}
+                    onChange={(value) => updateActiveXSearchSetting("language", value)}
+                  />
+                  <NumberInput
+                    label="取得期間(日)"
+                    value={activeXSearchSetting.periodDays}
+                    onChange={(value) => updateActiveXSearchSetting("periodDays", value)}
+                  />
+                  <NumberInput
+                    label="最低リポスト"
+                    value={activeXSearchSetting.minimumReposts}
+                    onChange={(value) => updateActiveXSearchSetting("minimumReposts", value)}
+                  />
+                  <Input
+                    label="ブランド"
+                    value={activeXSearchSetting.brand}
+                    onChange={(value) => updateActiveXSearchSetting("brand", value)}
+                  />
+                </div>
+                <label className="mt-3 flex items-center gap-2 text-sm font-bold">
+                  <input
+                    type="checkbox"
+                    checked={activeXSearchSetting.isActive}
+                    onChange={(event) => updateActiveXSearchSetting("isActive", event.target.checked)}
+                  />
+                  この条件を有効にする
+                </label>
+              </details>
+            </aside>
+
+            <div>
+              <div className="rounded-lg border border-slate-200 p-3">
+                <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                  <label className="block text-sm font-bold">
+                    表示順
+                    <select
+                      value={xSortKey}
+                      onChange={(event) => setXSortKey(event.target.value as XSortKey)}
+                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                    >
+                      <option value="buzzScore">バズ度</option>
+                      <option value="likeCount">いいね数</option>
+                      <option value="repostCount">リポスト数</option>
+                      <option value="engagementRate">反応率</option>
+                      <option value="postedAt">投稿日</option>
+                    </select>
+                  </label>
+                  <p className="text-sm text-slate-600">
+                  表示中 {visibleXTrendingPosts.length}件 / 保存済み {xTrendingPosts.length}件
+                  </p>
+                </div>
+                <div className="mt-3 rounded-md border border-pink-200 bg-pink-50 px-3 py-2 text-sm text-pink-700">
+                  <p className="font-bold">次にやること</p>
+                  <p className="mt-1">
+                    投稿が集まったら、各カードの「AI分析してThreads案を作る」を押してください。押すと分析結果と投稿案3つがカード内に出ます。
+                  </p>
+                </div>
+                <details className="mt-3 text-sm">
+                  <summary className="cursor-pointer font-bold text-slate-600">絞り込みを開く</summary>
+                  <div className="mt-3 grid gap-3 md:grid-cols-3">
+                    <NumberInput label="最低バズ度" value={xMinimumBuzz} onChange={setXMinimumBuzz} />
+                    <label className="mt-6 flex items-center gap-2 text-sm font-bold">
+                      <input type="checkbox" checked={xOnlyFavorite} onChange={(event) => setXOnlyFavorite(event.target.checked)} />
+                      お気に入りのみ
+                    </label>
+                    <label className="mt-6 flex items-center gap-2 text-sm font-bold">
+                      <input type="checkbox" checked={xHideHidden} onChange={(event) => setXHideHidden(event.target.checked)} />
+                      非表示を除外
+                    </label>
+                  </div>
+                </details>
+              </div>
+
+              <div className="mt-3 space-y-3">
+                {visibleXTrendingPosts.length ? (
+                  visibleXTrendingPosts.map((post) => (
+                    <XTrendingPostCard
+                      key={post.id}
+                      post={post}
+                      analysisResult={xAnalyses[post.id]}
+                      copiedId={copiedId}
+                      analyzing={xAnalyzingId === post.id}
+                      onAnalyze={() => analyzeXTrendingPost(post)}
+                      onCopy={copyText}
+                      onToggleFavorite={() => updateXPost(post.id, { isFavorite: !post.isFavorite })}
+                      onHide={() => updateXPost(post.id, { isHidden: true, status: "非表示" })}
+                      onDraftChange={(draftIndex, patch) => updateXDraft(post.id, draftIndex, patch)}
+                      onSendDraft={(draft) => sendBuzzDraftToCalendar(post, draft)}
+                    />
+                  ))
+                ) : (
+                  <div className="rounded-lg border border-slate-200 p-4 text-sm text-slate-600">
+                    まだ投稿候補がありません。左の「この条件でバズ投稿を集める」を押すと投稿カードが表示されます。AI分析ボタンは投稿カードの中に出ます。
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       {view === "calendar" ? (
       <>
       <form onSubmit={handleSubmit} className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
@@ -1403,6 +1963,154 @@ export default function Home() {
   );
 }
 
+function XTrendingPostCard({
+  post,
+  analysisResult,
+  copiedId,
+  analyzing,
+  onAnalyze,
+  onCopy,
+  onToggleFavorite,
+  onHide,
+  onDraftChange,
+  onSendDraft
+}: {
+  post: XTrendingPost;
+  analysisResult?: XBuzzAnalyzeResult;
+  copiedId: string;
+  analyzing: boolean;
+  onAnalyze: () => void;
+  onCopy: (id: string, text: string) => void;
+  onToggleFavorite: () => void;
+  onHide: () => void;
+  onDraftChange: (draftIndex: number, patch: Partial<ThreadsDraftIdea>) => void;
+  onSendDraft: (draft: ThreadsDraftIdea) => void;
+}) {
+  const engagementLabel = post.engagementRate === undefined ? "不明" : `${post.engagementRate}%`;
+  const riskLabel = analysisResult?.analysis.riskLevel || "未分析";
+
+  return (
+    <article className={`rounded-lg border p-3 ${post.isHidden ? "border-slate-200 bg-slate-50 opacity-70" : "border-slate-200 bg-white"}`}>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap gap-2 text-xs font-bold">
+            <span className="rounded-full bg-pink-100 px-2 py-1 text-pink-700">バズ度 {post.buzzScore}</span>
+            <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">いいね {post.likeCount}</span>
+            <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">リポスト {post.repostCount}</span>
+            <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">反応率 {engagementLabel}</span>
+            {post.hasMedia ? <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">画像/動画あり</span> : null}
+          </div>
+          <p className="mt-3 text-sm font-bold">
+            {post.authorName} <span className="text-slate-500">@{post.authorUsername}</span>
+          </p>
+          <details className="mt-2">
+            <summary className="cursor-pointer text-sm font-bold text-slate-700">投稿本文を見る</summary>
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{post.text}</p>
+          </details>
+          <p className="mt-2 text-xs text-slate-500">
+            投稿日: {new Date(post.postedAt).toLocaleString("ja-JP")} / 状態: {post.status}
+          </p>
+        </div>
+        <div className="grid shrink-0 grid-cols-2 gap-2 lg:w-48 lg:grid-cols-1">
+          <button type="button" onClick={() => window.open(post.postUrl, "_blank", "noopener,noreferrer")} className="rounded-md border border-slate-300 px-3 py-2 text-sm font-bold">
+            元投稿を開く
+          </button>
+          <button type="button" onClick={onAnalyze} disabled={analyzing} className="rounded-md bg-pink-600 px-3 py-3 text-sm font-bold text-white disabled:opacity-45">
+            {analyzing ? "分析中..." : analysisResult ? "再分析して3案作る" : "AI分析してThreads案を作る"}
+          </button>
+          <button type="button" onClick={onToggleFavorite} className="rounded-md border border-slate-300 px-3 py-2 text-sm font-bold">
+            {post.isFavorite ? "★ お気に入り" : "☆ お気に入り"}
+          </button>
+          <button type="button" onClick={onHide} className="rounded-md border border-slate-300 px-3 py-2 text-sm font-bold">
+            非表示
+          </button>
+        </div>
+      </div>
+
+      {analysisResult ? (
+        <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+          <div className="grid gap-3 lg:grid-cols-3">
+            <div className="lg:col-span-1">
+              <h4 className="font-bold">AI分析</h4>
+              <dl className="mt-2 space-y-2 text-sm">
+                <div>
+                  <dt className="font-bold">主題</dt>
+                  <dd className="text-slate-600">{analysisResult.analysis.topic}</dd>
+                </div>
+                <div>
+                  <dt className="font-bold">伸びた理由</dt>
+                  <dd className="text-slate-600">{analysisResult.analysis.viralReason}</dd>
+                </div>
+                <div>
+                  <dt className="font-bold">フック型</dt>
+                  <dd className="text-slate-600">{analysisResult.analysis.hookPattern}</dd>
+                </div>
+                <div>
+                  <dt className="font-bold">リスク</dt>
+                  <dd className="text-slate-600">
+                    {riskLabel} / 相性 {analysisResult.analysis.brandFitScore}点
+                    {analysisResult.analysis.needsFactCheck ? " / 要ファクトチェック" : ""}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+
+            <div className="space-y-3 lg:col-span-2">
+              <h4 className="font-bold">Threads投稿案 3案</h4>
+              {analysisResult.drafts.map((draft, draftIndex) => {
+                const fullText = [draft.opening, draft.body, draft.closing]
+                  .filter(Boolean)
+                  .join("\n\n");
+
+                return (
+                  <div key={`${post.id}-draft-${draftIndex}`} className="rounded-md border border-slate-200 bg-white p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="font-bold">{draftIndex + 1}. {draft.type}</p>
+                      <div className="flex flex-wrap gap-2 text-xs font-bold">
+                        <span className={`rounded-full px-2 py-1 ${
+                          draft.similarityRisk === "high"
+                            ? "bg-red-100 text-red-700"
+                            : draft.similarityRisk === "medium"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-green-100 text-green-700"
+                        }`}>
+                          類似リスク {draft.similarityRisk} / {draft.similarityScore}
+                        </span>
+                        {draft.needsFactCheck ? <span className="rounded-full bg-red-100 px-2 py-1 text-red-700">要確認</span> : null}
+                      </div>
+                    </div>
+                    <label className="mt-2 block text-xs font-bold text-slate-600">
+                      投稿文
+                      <textarea
+                        value={fullText}
+                        onChange={(event) => onDraftChange(draftIndex, { body: event.target.value, opening: "", closing: "", hashtags: [] })}
+                        rows={7}
+                        className="mt-1 w-full resize-y rounded-md border border-slate-300 p-3 text-sm leading-6"
+                      />
+                    </label>
+                    <p className="mt-2 text-xs text-slate-600">追加すべき独自情報: {draft.originalInfoNeeded || "なし"}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button type="button" onClick={() => onCopy(`x-draft-${post.id}-${draftIndex}`, fullText)} className="rounded-md border border-slate-300 px-3 py-2 text-sm font-bold">
+                        {copiedId === `x-draft-${post.id}-${draftIndex}` ? "コピー済み" : "コピー"}
+                      </button>
+                      <button type="button" onClick={onAnalyze} className="rounded-md border border-slate-300 px-3 py-2 text-sm font-bold">
+                        AIで再生成
+                      </button>
+                      <button type="button" onClick={() => onSendDraft(draft)} className="rounded-md bg-pink-600 px-3 py-2 text-sm font-bold text-white">
+                        投稿カレンダーへ送る
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
 function NavButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
@@ -1438,6 +2146,20 @@ function Input({ label, value, onChange }: { label: string; value: string; onCha
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2"
+      />
+    </label>
+  );
+}
+
+function NumberInput({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+  return (
+    <label className="block">
+      <span className="text-sm font-bold">{label}</span>
+      <input
+        type="number"
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
         className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2"
       />
     </label>
@@ -1843,6 +2565,16 @@ function addDays(startDate: string, days: number) {
   const date = startDate ? new Date(`${startDate}T00:00:00`) : new Date();
   date.setDate(date.getDate() + days);
   return date.toISOString().slice(0, 10);
+}
+
+function mergeXPosts(current: XTrendingPost[], incoming: XTrendingPost[]) {
+  const map = new Map<string, XTrendingPost>();
+  current.forEach((post) => map.set(post.xPostId, post));
+  incoming.forEach((post) => {
+    const existing = map.get(post.xPostId);
+    map.set(post.xPostId, existing ? { ...post, ...existing, buzzScore: post.buzzScore } : post);
+  });
+  return Array.from(map.values());
 }
 
 function buildMonthCalendar(startDate: string) {

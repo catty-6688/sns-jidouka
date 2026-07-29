@@ -69,6 +69,14 @@ function pickString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function removeHashtags(value: string) {
+  return value
+    .replace(/(?:^|\s)[#＃][^\s#＃]+/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function validateBody(body: unknown): GenerateRequest | null {
   if (!body || typeof body !== "object") return null;
   const data = body as Record<string, unknown>;
@@ -126,11 +134,11 @@ function extractJson(text: string): GeneratedResult {
   return {
     threads: parsed.threads.slice(0, 3).map((post, index) => ({
       title: pickString(post.title) || `Threads投稿 ${index + 1}`,
-      body: pickString(post.body)
+      body: removeHashtags(pickString(post.body))
     })),
     x: parsed.x.slice(0, 3).map((post, index) => ({
       title: pickString(post.title) || `X投稿 ${index + 1}`,
-      body: pickString(post.body)
+      body: removeHashtags(pickString(post.body))
     })),
     weekly: Array.isArray(parsed.weekly)
       ? parsed.weekly.slice(0, 7).map((day, dayIndex) => ({
@@ -140,7 +148,7 @@ function extractJson(text: string): GeneratedResult {
           posts: Array.isArray(day.posts)
             ? day.posts.slice(0, 5).map((post, postIndex) => ({
                 title: pickString(post.title) || `投稿 ${postIndex + 1}`,
-                body: pickString(post.body),
+                body: removeHashtags(pickString(post.body)),
                 cta: pickString(post.cta),
                 experienceUsed: pickString(post.experienceUsed) || "【ここに体験】",
                 referencePattern: pickString(post.referencePattern),
@@ -289,7 +297,7 @@ ${base}
 - Threads投稿は短め。120〜220字を目安に、スマホで読みやすい短文改行
 - 最近の自分の投稿がある場合、言葉選び、改行、語尾、絵文字量、テンションを分析して寄せる
 - 絵文字はゼロにしない。未設定なら1投稿0〜2個まで自然に使う
-- ハッシュタグは必要な場合のみ最大2個
+- ハッシュタグは付けない
 
 次のJSON形式だけで返してください。
 {
