@@ -101,7 +101,8 @@ const defaultXSearchSetting: XSearchSetting = {
   excludedKeywords: "簡単に稼げる\n誰でも月収\n確実に稼げる",
   language: "ja",
   periodDays: 7,
-  minimumImpressions: 10000,
+  minimumImpressions: 0,
+  minimumEngagements: 20,
   minimumLikes: 0,
   minimumReposts: 0,
   fetchLimit: 15,
@@ -330,6 +331,7 @@ export default function Home() {
             ...defaultXSearchSetting,
             ...setting,
             minimumImpressions: setting.minimumImpressions ?? defaultXSearchSetting.minimumImpressions,
+            minimumEngagements: setting.minimumEngagements ?? defaultXSearchSetting.minimumEngagements,
             minimumLikes: setting.minimumLikes ?? defaultXSearchSetting.minimumLikes
           }));
           setXSearchSettings(normalized);
@@ -1610,10 +1612,10 @@ export default function Home() {
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 {[
-                  { name: "AI投稿", keywords: "ChatGPT\nClaude\nAI活用\nSNS運用", minimumImpressions: 10000, minimumLikes: 0, fetchLimit: 15 },
-                  { name: "副業", keywords: "AI副業\n副業\n在宅ワーク\nSNS集客", minimumImpressions: 10000, minimumLikes: 0, fetchLimit: 15 },
-                  { name: "看護師副業", keywords: "看護師副業\n看護師 在宅\nナース副業", minimumImpressions: 10000, minimumLikes: 0, fetchLimit: 15 },
-                  { name: "美容×AI", keywords: "美容 AI\n美容 SNS\n美容集客", minimumImpressions: 10000, minimumLikes: 0, fetchLimit: 15 }
+                  { name: "AI投稿", keywords: "ChatGPT\nClaude\nAI活用\nSNS運用", minimumEngagements: 20, minimumLikes: 0, fetchLimit: 15 },
+                  { name: "副業", keywords: "AI副業\n副業\n在宅ワーク\nSNS集客", minimumEngagements: 20, minimumLikes: 0, fetchLimit: 15 },
+                  { name: "看護師副業", keywords: "看護師副業\n看護師 在宅\nナース副業", minimumEngagements: 10, minimumLikes: 0, fetchLimit: 15 },
+                  { name: "美容×AI", keywords: "美容 AI\n美容 SNS\n美容集客", minimumEngagements: 10, minimumLikes: 0, fetchLimit: 15 }
                 ].map((preset) => (
                   <button
                     key={preset.name}
@@ -1621,7 +1623,8 @@ export default function Home() {
                     onClick={() => {
                       updateActiveXSearchSetting("name", preset.name);
                       updateActiveXSearchSetting("keywords", preset.keywords);
-                      updateActiveXSearchSetting("minimumImpressions", preset.minimumImpressions);
+                      updateActiveXSearchSetting("minimumImpressions", 0);
+                      updateActiveXSearchSetting("minimumEngagements", preset.minimumEngagements);
                       updateActiveXSearchSetting("minimumLikes", preset.minimumLikes);
                       updateActiveXSearchSetting("fetchLimit", preset.fetchLimit);
                     }}
@@ -1644,9 +1647,9 @@ export default function Home() {
               />
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <NumberInput
-                  label="最低表示数"
-                  value={activeXSearchSetting.minimumImpressions ?? defaultXSearchSetting.minimumImpressions}
-                  onChange={(value) => updateActiveXSearchSetting("minimumImpressions", value)}
+                  label="最低反応数"
+                  value={activeXSearchSetting.minimumEngagements ?? defaultXSearchSetting.minimumEngagements}
+                  onChange={(value) => updateActiveXSearchSetting("minimumEngagements", value)}
                 />
                 <NumberInput
                   label="取得件数"
@@ -1667,6 +1670,7 @@ export default function Home() {
                   type="button"
                   onClick={() => {
                     updateActiveXSearchSetting("minimumImpressions", 0);
+                    updateActiveXSearchSetting("minimumEngagements", 0);
                     updateActiveXSearchSetting("minimumLikes", 0);
                     updateActiveXSearchSetting("minimumReposts", 0);
                     updateActiveXSearchSetting("fetchLimit", 30);
@@ -1741,6 +1745,11 @@ export default function Home() {
                     onChange={(value) => updateActiveXSearchSetting("periodDays", value)}
                   />
                   <NumberInput
+                    label="最低表示数（補助）"
+                    value={activeXSearchSetting.minimumImpressions ?? defaultXSearchSetting.minimumImpressions}
+                    onChange={(value) => updateActiveXSearchSetting("minimumImpressions", value)}
+                  />
+                  <NumberInput
                     label="最低いいね（補助）"
                     value={activeXSearchSetting.minimumLikes}
                     onChange={(value) => updateActiveXSearchSetting("minimumLikes", value)}
@@ -1798,7 +1807,7 @@ export default function Home() {
                 <div className="mt-3 rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
                   <p className="font-bold">0件になる主な理由</p>
                   <p className="mt-1">
-                    X APIから最大100件の候補を取得し、その後に「最低表示数」で絞ります。1万表示以上が出ない時は、キーワードを具体化するか、ベンチマークのXアカウントを詳細設定に入れてください。
+                    X APIから最大100件の候補を取得し、その後に「最低反応数」で絞ります。出ない時は最低反応数を10まで下げるか、ベンチマークのXアカウントを詳細設定に入れてください。
                   </p>
                 </div>
                 <details className="mt-3 text-sm">

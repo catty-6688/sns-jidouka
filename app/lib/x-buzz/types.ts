@@ -8,6 +8,7 @@ export type XSearchSetting = {
   language: string;
   periodDays: number;
   minimumImpressions: number;
+  minimumEngagements: number;
   minimumLikes: number;
   minimumReposts: number;
   fetchLimit: number;
