@@ -44,8 +44,31 @@ export async function POST(request: Request) {
 
   try {
     const provider = createXProvider();
-    const posts = await provider.fetchTrendingPosts({ setting });
-    return NextResponse.json({ posts, source: getXProviderStatus().mode });
+    const candidates = await provider.fetchTrendingPosts({ setting });
+    const strictPosts = candidates
+      .filter((post) => post.likeCount >= setting.minimumLikes && post.repostCount >= setting.minimumReposts)
+      .slice(0, setting.fetchLimit);
+    const relaxed = strictPosts.length === 0 && candidates.length > 0;
+    const posts = relaxed ? candidates.slice(0, setting.fetchLimit) : strictPosts;
+
+    const message = relaxed
+      ? `Xから${candidates.length}件見つかりましたが、最低いいね${setting.minimumLikes}以上では0件でした。条件をゆるめた候補を表示します。`
+      : posts.length
+        ? `${posts.length}件の投稿候補を取得しました。`
+        : `Xから候補が見つかりませんでした。キーワードを減らすか、取得件数を増やしてください。`;
+
+    return NextResponse.json({
+      posts,
+      source: getXProviderStatus().mode,
+      message,
+      diagnostics: {
+        candidateCount: candidates.length,
+        strictCount: strictPosts.length,
+        relaxed,
+        minimumLikes: setting.minimumLikes,
+        minimumReposts: setting.minimumReposts
+      }
+    });
   } catch (error) {
     console.error(error);
     return NextResponse.json(

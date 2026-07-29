@@ -139,8 +139,6 @@ export class MockXProvider implements XPostProvider {
         const matchesExclude = excluded.some((keyword) => post.text.includes(keyword));
         return matchesKeyword && !matchesExclude;
       })
-      .filter((post) => post.likeCount >= setting.minimumLikes && post.repostCount >= setting.minimumReposts)
-      .slice(0, Math.max(1, setting.fetchLimit))
       .map((post, index) => {
         const postedAt = new Date(Date.now() - (index + 1) * 6 * 60 * 60 * 1000).toISOString();
         const metrics = calculateBuzzMetrics(post);
@@ -254,9 +252,8 @@ export class XApiProvider implements XPostProvider {
           isHidden: false
         };
       })
-      .filter((post) => post.likeCount >= setting.minimumLikes && post.repostCount >= setting.minimumReposts)
       .sort((a, b) => b.buzzScore - a.buzzScore)
-      .slice(0, setting.fetchLimit);
+      .slice(0, Math.min(Math.max(setting.fetchLimit, 10), 100));
   }
 }
 

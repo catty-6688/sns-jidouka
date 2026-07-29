@@ -590,13 +590,21 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ setting: activeXSearchSetting })
       });
-      const data = (await response.json()) as { posts?: XTrendingPost[]; message?: string; source?: "api" | "mock" };
+      const data = (await response.json()) as {
+        posts?: XTrendingPost[];
+        message?: string;
+        source?: "api" | "mock";
+        diagnostics?: { relaxed?: boolean; candidateCount?: number; strictCount?: number };
+      };
       if (!response.ok || !data.posts) throw new Error(data.message || "X投稿を取得できませんでした。");
 
       const merged = mergeXPosts(xTrendingPosts, data.posts);
       setXTrendingPosts(merged);
       window.localStorage.setItem(xTrendingPostsStorageKey, JSON.stringify(merged));
-      markAction("x-fetch", `${data.posts.length}件の投稿候補を取得しました（${data.source === "api" ? "X API" : "テストデータ"}）`);
+      markAction(
+        "x-fetch",
+        `${data.message || `${data.posts.length}件の投稿候補を取得しました`}（${data.source === "api" ? "X API" : "テストデータ"}）`
+      );
       void refreshXConnectionStatus();
     } catch (caught) {
       setXBuzzError(caught instanceof Error ? caught.message : "X投稿の取得に失敗しました。");
@@ -1649,6 +1657,18 @@ export default function Home() {
                 </button>
                 <button
                   type="button"
+                  onClick={() => {
+                    updateActiveXSearchSetting("minimumLikes", 0);
+                    updateActiveXSearchSetting("minimumReposts", 0);
+                    updateActiveXSearchSetting("fetchLimit", 30);
+                    flash("条件をゆるめました。もう一度バズ投稿を集めてください");
+                  }}
+                  className="rounded-md border border-pink-300 bg-pink-50 px-4 py-2 text-sm font-bold text-pink-700"
+                >
+                  0件なら条件をゆるめる
+                </button>
+                <button
+                  type="button"
                   onClick={() => saveXSearchSettings()}
                   className={`rounded-md border border-slate-300 px-4 py-2 text-sm font-bold transition active:scale-[0.98] ${
                     actionFeedback === "x-search-save" ? "bg-green-500 text-white" : ""
@@ -1758,6 +1778,12 @@ export default function Home() {
                   <p className="font-bold">次にやること</p>
                   <p className="mt-1">
                     投稿が集まったら、各カードの「AI分析してThreads案を作る」を押してください。押すと分析結果と投稿案3つがカード内に出ます。
+                  </p>
+                </div>
+                <div className="mt-3 rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
+                  <p className="font-bold">0件になる主な理由</p>
+                  <p className="mt-1">
+                    X APIはバズ順ではなく最近の投稿から取得します。その後に「最低いいね」で絞るため、500以上など条件が強いと0件になりやすいです。
                   </p>
                 </div>
                 <details className="mt-3 text-sm">
